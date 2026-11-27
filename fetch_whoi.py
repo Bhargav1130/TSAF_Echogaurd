@@ -55,12 +55,16 @@ def parse_tally(html):
 
 
 def to_hourly(tally, min_listen_s=1800):
-    """Sum right whale calls per UTC hour. Hours where the buoy listened for
-    less than `min_listen_s` seconds become NaN (missing, not zero)."""
+    """Right whale calls per UTC hour. Hours where the buoy listened for less than
+    `min_listen_s` seconds become NaN (missing, not zero); partly heard hours are
+    scaled to a full hour (calls x 3600 / seconds listened)."""
     g = tally.set_index("time").sort_index().resample("h")
     h = pd.DataFrame({"calls": g.right.sum().astype(float), "listen_s": g.duration_s.sum()})
     h.loc[h.listen_s < min_listen_s, "calls"] = np.nan
-    return h.loc[:h.calls.last_valid_index()]       # drop the unfinished current hour
+    part = h.listen_s.between(min_listen_s, 3599)
+    h.loc[part, "calls"] = (h.calls[part] * 3600 / h.listen_s[part]).round(1)
+    # the newest hour is usually still filling in (the page posts 15-min rows): drop it unless complete
+    return h.loc[:h.index[h.listen_s >= 3600][-1]]
 
 
 def fetch_tally(platform, days, cache_dir):

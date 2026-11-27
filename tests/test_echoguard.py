@@ -150,11 +150,15 @@ def test_whoi_parser_and_hourly():
     rows = [("20261125090120", 1, 900), ("20261125091620", 6, 900), ("20261125093120", 0, 900),
             ("20261125094620", 1, 900),                       # 09 UTC: 8 calls, full hour
             ("20261125100120", 2, 600),                       # 10 UTC: buoy barely listening
-            ("20261125110120", 3, 900), ("20261125111620", 0, 900)]   # 11 UTC: 3 calls
+            ("20261125110120", 3, 900), ("20261125111620", 0, 900),   # 11 UTC: 3 calls in 30 min
+            ("20261125120120", 2, 900), ("20261125121620", 2, 900), ("20261125123120", 0, 900),
+            ("20261125124620", 0, 900),                       # 12 UTC: 4 calls, full hour
+            ("20261125130120", 5, 900)]                       # 13 UTC: still filling in -> dropped
     tally = fetch_whoi.parse_tally("".join(row.format(id=i, r=r, d=d) for i, r, d in rows))
-    assert len(tally) == 7 and str(tally.time.iloc[0]) == "2026-11-25 09:01:20+00:00"
+    assert len(tally) == 12 and str(tally.time.iloc[0]) == "2026-11-25 09:01:20+00:00"
     h = fetch_whoi.to_hourly(tally)
-    assert h.calls.iloc[0] == 8 and np.isnan(h.calls.iloc[1]) and h.calls.iloc[2] == 3
+    assert h.calls.iloc[0] == 8 and np.isnan(h.calls.iloc[1])
+    assert h.calls.iloc[2] == 6 and h.calls.iloc[3] == 4 and len(h) == 4    # 3 calls in half an hour = 6/h
 
 
 def test_risk_rules():
