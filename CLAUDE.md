@@ -92,7 +92,19 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   1.8 calls/h vs 88.7 peak) Naive won; that test was meaningless. summary.json now has "folds" and
   "detector_rates"; data/buoy_hourly.source.json (from fetch_dclde) gives the site its source note.
 
-## Verified results — REAL Cape Cod Bay 2019 (CURRENT outputs/, kept by the user 27 Nov 2026)
+## Verified results — LIVE WHOI Cape Cod Bay (CURRENT outputs/, 27 Nov 2026)
+- Data: GitHub Actions run 27 Nov 11:39 UTC -> data/live_hourly.csv, 29 Sep - 27 Nov 2026 07:00 UTC,
+  1420 h, 4573 calls, 33 h offline (16-h gap from 26 Nov 13:00). Command:
+  `python run_all.py --skip-detector --hourly-csv data/live_hourly.csv` (40 s; WHOI counts used as-is, rates 1/1).
+- ADF 0.001 / KPSS 0.01, STL seasonal 0.22 / trend 0.13, ACF24 0.249, peak 01:00 UTC, daily calls vs SST r = -0.64.
+- AIC best SARIMA(2,0,2)(0,0,0)24. 5 folds from hour 1060: SARIMA MAE 7.06 MASE 2.17 cov 83% | SARIMAX 8.22 / 66% |
+  HW 8.33 / 76% | Seasonal naive 8.85 / 72% | Naive 9.15 / 86%. MASE > 1: bursty calls, hard to beat naive.
+- Live forecast from 27 Nov 08:00 UTC: point ~3 calls/h, 80% band 0-22 -> HIGH all 72 h (upper bound > 5).
+- Interval fix (27 Nov): empirical_interval now floors lo and ceils hi (counts are integers). Before, lo = 0.14
+  excluded every zero-call hour and SARIMA covered 41%. The 2019 numbers below predate this fix (coverage can only
+  rise slightly); 2019 outputs backed up in the scratchpad (real2019_outputs). Website still shows 2019 (v4).
+
+## Verified results — REAL Cape Cod Bay 2019 (main results until 27 Nov 2026)
 - Command: `python run_all.py --kaggle-dir whale-detection-challenge/whale_data/data --clips 5000
   --hourly-csv data/buoy_hourly.csv --detector-rates 0.896 0.857` (302 s). Detector stage = MiniRocket on Kaggle.
 - 2757 h, 115,564 calls, 0 missing. ADF 0.018 / KPSS 0.01 -> d=0. STL seasonal 0.52, trend 0.53. ACF 24/48/72 =

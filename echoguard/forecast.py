@@ -152,7 +152,10 @@ def empirical_interval(run, y, s, h=C.HORIZON, n_cal=C.N_CAL, alpha=C.INTERVAL_A
         raise ValueError("Not enough history before the origin to calibrate the interval")
     q_lo, q_hi = np.quantile(errs, [alpha / 2, 1 - alpha / 2])
     r = dict(run(s))
-    r.update(lo=np.clip(r["mean"] + q_lo, 0, None), hi=r["mean"] + q_hi, err_sd=float(errs.std()), n_cal=len(cal))
+    # calls are whole numbers: round the band outwards, else a lower bound of 0.14 calls/h
+    # leaves every zero-call hour outside it (sparse live WHOI data: 80% band covered 41%)
+    r.update(lo=np.floor(np.clip(r["mean"] + q_lo, 0, None)), hi=np.ceil(r["mean"] + q_hi),
+             err_sd=float(errs.std()), n_cal=len(cal))
     return r
 
 
