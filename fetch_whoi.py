@@ -11,6 +11,7 @@ These are automatic detections; many periods are not yet analyst-reviewed.
 SST: NOAA CoastWatch ERDDAP, MUR SST v4.1 (jplMURSST41), daily.
 """
 import argparse
+import json
 import re
 import sys
 import time
@@ -94,6 +95,15 @@ def fetch_sst(start, lat, lon, end=None):
     return pd.Series(df.analysed_sst.to_numpy(), index=pd.to_datetime(df.time, utc=True).dt.floor("D"))
 
 
+def source_note(platform, h):
+    return {"name": "WHOI Robots4Whales live buoy detections",
+            "note": (f"Real right whale up-calls from the WHOI near real-time buoy {platform.split('/')[0]} "
+                     f"(Cape Cod Bay by default), {h.index[0]:%d %b} - {h.index[-1]:%d %b %Y %H:%M} UTC, "
+                     "counted every 15 minutes by the buoy's automatic detector (Baumgartner lab, WHOI; many periods "
+                     "not yet analyst-reviewed) and refreshed hourly. Hours the buoy was not listening are missing, "
+                     "not zero. SST: NOAA MUR via ERDDAP.")}
+
+
 def main():
     ap = argparse.ArgumentParser(description="Fetch real WHOI buoy right whale detections + NOAA SST")
     ap.add_argument("--platform", default="maccb2606/maccb2606_maccb",
@@ -121,6 +131,9 @@ def main():
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     h.to_csv(args.out, index_label="timestamp")
+    # plain-language source note read by site/build_site.py
+    Path(args.out).with_suffix(".source.json").write_text(json.dumps(source_note(args.platform, h), indent=1),
+                                                          encoding="utf-8")
     print(f"Wrote {args.out}  ({h.index[0]:%Y-%m-%d %H:%M} to {h.index[-1]:%Y-%m-%d %H:%M} UTC)")
     print(f"Next:  python run_all.py --skip-detector --hourly-csv {args.out}")
 
