@@ -9,6 +9,9 @@ on:
   schedule:
     - cron: "23 * * * *"      # every hour at :23 UTC (GitHub may start it a few minutes late)
   workflow_dispatch: {}       # "Run workflow" button in the Actions tab
+  push:                       # code or website changes go live at once (the bot's data commits use
+    branches: [main]          # GITHUB_TOKEN, which never triggers workflows, so this cannot loop)
+    paths-ignore: ["data/**", "**.md"]
 
 permissions:
   contents: write
