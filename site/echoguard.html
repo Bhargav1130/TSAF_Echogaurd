@@ -461,7 +461,8 @@ heroRisk();
 /* ---------------- pipeline stepper ---------------- */
 (() => {
   const det = D.detectors.find(d => d.detector === "MiniRocket") || {};
-  const best = D.models[0], n_true = D.hourly.calls_true ? d3.sum(D.hourly.calls_true) : null, n_det = d3.sum(calls.filter(x => x != null));
+  // totals rounded: partly heard WHOI hours are scaled to calls/h, so the sum is fractional
+  const best = D.models[0], n_true = D.hourly.calls_true ? Math.round(d3.sum(D.hourly.calls_true)) : null, n_det = Math.round(d3.sum(calls.filter(x => x != null)));
   const S = [
     ["Listen", "Hydrophone buoy", "Audio sampled at 2 kHz, cut into 2-second windows every second and band-passed to 50–250 Hz with a 4th-order Butterworth filter.",
       [["2 kHz", "sample rate"], ["2 s / 1 s", "window / hop"], ["50–250 Hz", "up-call band"]], "#detector"],
@@ -474,7 +475,7 @@ heroRisk();
     ["Forecast", "5 models", "Naive, seasonal naive, Holt-Winters, SARIMA and SARIMAX with sea temperature, tested on " + M.folds + " rolling 72-hour folds.",
       [[best.model, "best by MAE"], [f(best.mae), "MAE (calls/h)"], [Math.round(best.coverage80 * 100) + "%", "80% band coverage"]], "#models"],
     ["Warn", "Risk + CUSUM", "The upper edge of the 80% band sets LOW, MEDIUM or HIGH; HIGH hours merge into alert windows; CUSUM flags sudden rises.",
-      [[M.thresholds.backtest[0], "HIGH threshold (det/h)"], [windows(D.backtest.hi.map(u => levelOf(u, ...M.thresholds.backtest))).length, "alert windows"], ["+" + M.cusum.alarm + " h", "CUSUM alarm"]], "#forecast"]];
+      [[M.thresholds.backtest[0], "HIGH threshold (det/h)"], [windows(D.backtest.hi.map(u => levelOf(u, ...M.thresholds.backtest))).length, "alert windows"], [M.cusum.alarm == null ? "none" : "+" + M.cusum.alarm + " h", "CUSUM alarm"]], "#forecast"]];
   const pipe = $("#pipe"), box = $("#stageDetail");
   pipe.innerHTML = S.map((s, i) => `<button class="stage" style="--i:${i}" aria-pressed="${i === 0}" data-i="${i}"><span class="n">0${i + 1}</span><b>${s[0]}</b><span>${s[1]}</span></button>`).join("");
   const show = i => { const s = S[i]; pipe.querySelectorAll(".stage").forEach((b, k) => b.setAttribute("aria-pressed", k === i));
