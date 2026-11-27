@@ -393,10 +393,11 @@ const toReal = (t, o) => M.recall ? (t - (1 - M.precision) * meanBefore(o)) / M.
 
 /* ---------------- hero: risk now + chips ---------------- */
 function heroRisk() {
-  const bt = D.backtest, [hi, me] = M.thresholds.backtest, lv = levelOf(bt.hi[0], hi, me);
+  // the hour right after the data (live forecast), not the backtest fold
+  const lf = D.live, [hi, me] = M.thresholds.live, lv = levelOf(lf.hi[0], hi, me);
   $("#riskNow").innerHTML = `<div class="risk-badge" style="background:var(${LEVEL_C[lv]})">${lv}</div>
     <div class="eyebrow" style="color:var(--muted)">Risk, next hour</div>
-    <div class="mono" style="font-size:.85rem">Issued ${fmtT(new Date(M.issued.replace(" ", "T") + ":00Z"))}<br>${ADVICE[lv]}</div>`;
+    <div class="mono" style="font-size:.85rem">For ${fmtT(new Date(lf.t[0].replace(" ", "T") + ":00Z"))}<br>${ADVICE[lv]}</div>`;
   const ch = [[M.simulated ? "Simulated season" : "Real buoy data", M.simulated ? "--med" : "--low"],
     [M.simulated ? `Detector trained on ${M.detector_source.replace(" Whale Detection Challenge", "")} clips` : (M.source_name || "Real detections"), "--accent"],
     [`${M.model} · ${M.horizon} h ahead`, "--accent"]];

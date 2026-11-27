@@ -93,16 +93,18 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   "detector_rates"; data/buoy_hourly.source.json (from fetch_dclde) gives the site its source note.
 
 ## Verified results — LIVE WHOI Cape Cod Bay (CURRENT outputs/, 27 Nov 2026)
-- Data: GitHub Actions run 27 Nov 11:39 UTC -> data/live_hourly.csv, 29 Sep - 27 Nov 2026 07:00 UTC,
-  1420 h, 4573 calls, 33 h offline (16-h gap from 26 Nov 13:00). Command:
-  `python run_all.py --skip-detector --hourly-csv data/live_hourly.csv` (40 s; WHOI counts used as-is, rates 1/1).
-- ADF 0.001 / KPSS 0.01, STL seasonal 0.22 / trend 0.13, ACF24 0.249, peak 01:00 UTC, daily calls vs SST r = -0.64.
-- AIC best SARIMA(2,0,2)(0,0,0)24. 5 folds from hour 1060: SARIMA MAE 7.06 MASE 2.17 cov 83% | SARIMAX 8.22 / 66% |
-  HW 8.33 / 76% | Seasonal naive 8.85 / 72% | Naive 9.15 / 86%. MASE > 1: bursty calls, hard to beat naive.
-- Live forecast from 27 Nov 08:00 UTC: point ~3 calls/h, 80% band 0-22 -> HIGH all 72 h (upper bound > 5).
-- Interval fix (27 Nov): empirical_interval now floors lo and ceils hi (counts are integers). Before, lo = 0.14
-  excluded every zero-call hour and SARIMA covered 41%. The 2019 numbers below predate this fix (coverage can only
-  rise slightly); 2019 outputs backed up in the scratchpad (real2019_outputs). Website still shows 2019 (v4).
+- Data: GitHub Actions run 45996739028 (12:12 UTC) -> data/live_hourly.csv, 29 Sep - 27 Nov 2026 08:00 UTC,
+  1421 h, 4593 calls, 17 h offline. Partly heard hours scaled to calls/h, unfinished newest hour dropped.
+  Run #2 failed on a NOAA MUR SST 503; fetch_whoi.get_sst now falls back to OISST, then the previous CSV's SST.
+  Command: `python run_all.py --skip-detector --hourly-csv data/live_hourly.csv` (50 s; counts used as-is, rates 1/1).
+- ADF 0.001 / KPSS 0.01, STL seasonal 0.22 / trend 0.13, ACF24 0.250, peak 01:00 UTC, daily calls vs SST r = -0.65.
+- AIC best SARIMA(2,0,2)(0,0,0)24. 5 folds from hour 1061: SARIMA MAE 7.09 MASE 2.18 cov 82% | SARIMAX 8.24 / 66% |
+  Seasonal naive 8.86 / 72% | HW 10.38 / 51% | Naive 13.54 / 61%. MASE > 1: bursty calls.
+- Live forecast from 27 Nov 09:00 UTC: HIGH all 72 h (80% upper bound ~20 > 5). Last fold 67/72 inside band.
+- Interval fix (27 Nov): empirical_interval floors lo / ceils hi (integer counts); before, SARIMA covered 41%.
+  The 2019 numbers below predate it; 2019 outputs backed up in the scratchpad (real2019_outputs).
+- Website v6 = this run; hero "risk next hour" now uses the live forecast (was the backtest fold).
+  The website does not refresh itself: git pull, run_all, build_site, republish.
 
 ## Verified results — REAL Cape Cod Bay 2019 (main results until 27 Nov 2026)
 - Command: `python run_all.py --kaggle-dir whale-detection-challenge/whale_data/data --clips 5000
