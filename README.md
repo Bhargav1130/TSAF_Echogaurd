@@ -50,6 +50,9 @@ If your network cannot reach whoi.edu, let a cloud machine fetch it:
   `data/live_hourly.csv`. Start it once from the Actions tab ("live WHOI data" > Run workflow).
   On the laptop, `git pull` (or download the file) and run
   `python run_all.py --skip-detector --hourly-csv data/live_hourly.csv`.
+  The same job then runs the pipeline and publishes the website on GitHub Pages
+  (https://bhargav1130.github.io/TSAF_Echogaurd/), so the page always shows the latest forecast.
+  One-time setup: Settings > Pages > Source: GitHub Actions.
 - **Google Colab (manual).** Open `colab_live_whoi.ipynb` in Colab (File > Upload notebook),
   Run all, put the downloaded `live_hourly.csv` in `data/`, then run the same command.
 

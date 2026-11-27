@@ -104,7 +104,10 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
 - Interval fix (27 Nov): empirical_interval floors lo / ceils hi (integer counts); before, SARIMA covered 41%.
   The 2019 numbers below predate it; 2019 outputs backed up in the scratchpad (real2019_outputs).
 - Website v6 = this run; hero "risk next hour" now uses the live forecast (was the backtest fold).
-  The website does not refresh itself: git pull, run_all, build_site, republish.
+  Hourly workflow also runs run_all + build_site and deploys site/index.html to GitHub Pages
+  (https://bhargav1130.github.io/TSAF_Echogaurd/; needs Settings > Pages > Source: GitHub Actions).
+  The Claude Artifact copy still needs a manual republish. With --skip-detector, run_all now reads
+  outputs/detector_metrics.csv (kept in git, has a source column) so the detector section is filled.
 
 ## Verified results — REAL Cape Cod Bay 2019 (main results until 27 Nov 2026)
 - Command: `python run_all.py --kaggle-dir whale-detection-challenge/whale_data/data --clips 5000

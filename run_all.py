@@ -40,7 +40,7 @@ def run_detector(args):
     t0 = time.time()
     rows, fitted = detect.evaluate_detectors(X, y)
     table = pd.DataFrame(rows)
-    table.to_csv(C.OUT_DIR / "detector_metrics.csv", index=False)
+    table.assign(source=source).to_csv(C.OUT_DIR / "detector_metrics.csv", index=False)
     print(table.to_string(index=False))
     # precision-recall curves on the test split
     _, _, te = detect.split_indices(len(X), y)
@@ -52,6 +52,16 @@ def run_detector(args):
     plots.detector_pr(curves, C.FIG_DIR / "detector_pr.png")
     print(f"detection stage took {time.time() - t0:.0f}s")
     return {"source": source, "metrics": rows}
+
+
+def saved_detector():
+    """Detector results of the last full run (outputs/detector_metrics.csv, kept in git) or None."""
+    f = C.OUT_DIR / "detector_metrics.csv"
+    if not f.exists():
+        return None
+    t = pd.read_csv(f)
+    source = t.pop("source").iloc[0] if "source" in t else "earlier run"
+    return {"source": source, "metrics": t.to_dict(orient="records")}
 
 
 def _minirocket_rates(det):
@@ -233,7 +243,7 @@ def main():
 
     C.FIG_DIR.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
-    det = None if args.skip_detector else run_detector(args)
+    det = saved_detector() if args.skip_detector else run_detector(args)
     h, y, source, rates = run_series(args, det)
     an = run_analysis(h, y)
     summary, best, lb, fc, inside, s, search, diag, err_sd = run_forecasting(h, y, args, rates)

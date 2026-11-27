@@ -1,6 +1,8 @@
-# Fetches live WHOI Cape Cod Bay buoy detections every hour on GitHub's servers
-# (dcs.whoi.edu is blocked on some home networks) and commits data/live_hourly.csv.
-# On the laptop:  python run_all.py --skip-detector --hourly-csv data/live_hourly.csv
+# Every hour on GitHub's servers (dcs.whoi.edu is blocked on some home networks):
+#   1. fetch live WHOI Cape Cod Bay buoy detections -> commit data/live_hourly.csv
+#   2. run the forecasting pipeline on it and rebuild the website
+#   3. publish the website on GitHub Pages (https://<user>.github.io/<repo>/)
+# One-time setup: Settings > Pages > Source: "GitHub Actions".
 name: live WHOI data
 
 on:
@@ -10,6 +12,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: live-whoi
@@ -24,18 +28,41 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install "numpy>=1.24" "pandas>=2.2"
+          cache: pip
+      - run: pip install "numpy>=1.24" "pandas>=2.2" "scipy>=1.10" "statsmodels>=0.14" "scikit-learn>=1.3" "matplotlib>=3.7"
       - name: Restore cached WHOI day pages
         uses: actions/cache@v4
         with:
           path: data/whoi_cache
           key: whoi-${{ github.run_id }}
           restore-keys: whoi-
-      - run: python fetch_whoi.py --days 60 --out data/live_hourly.csv
+      - name: Fetch live WHOI data
+        id: fetch
+        continue-on-error: true      # WHOI down: still rebuild the site from the last committed data
+        run: python fetch_whoi.py --days 60 --out data/live_hourly.csv
       - name: Commit if the data changed
+        if: steps.fetch.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/live_hourly.csv data/live_hourly.source.json
           git diff --cached --quiet || git commit -m "live WHOI data $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push
+          git pull --rebase && git push
+      - name: Forecast and rebuild the website
+        run: |
+          python run_all.py --skip-detector --hourly-csv data/live_hourly.csv
+          python site/build_site.py
+          mkdir -p _site && cp site/index.html _site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: fetch
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
