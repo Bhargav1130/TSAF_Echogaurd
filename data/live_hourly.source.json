@@ -1,4 +1,4 @@
 {
  "name": "WHOI Robots4Whales live buoy detections",
- "note": "Real right whale up-calls from the WHOI near real-time buoy maccb2606 (Cape Cod Bay by default), 29 Sep - 27 Nov 2026 14:00 UTC, counted every 15 minutes by the buoy's automatic detector (Baumgartner lab, WHOI; many periods not yet analyst-reviewed) and refreshed hourly. Hours the buoy was not listening are missing, not zero. SST: kept from the previous download (NOAA ERDDAP was unavailable)."
+ "note": "Real right whale up-calls from the WHOI near real-time buoy maccb2606 (Cape Cod Bay by default), 29 Sep - 27 Nov 2026 14:00 UTC, counted every 15 minutes by the buoy's automatic detector (Baumgartner lab, WHOI; many periods not yet analyst-reviewed) and refreshed hourly. Hours the buoy was not listening are missing, not zero. SST: NOAA MUR SST v4.1 via ERDDAP."
 }
