@@ -170,3 +170,16 @@ def test_risk_rules():
     assert risk.alert_windows(range(1, 7), lv, max_gap=1) == [(3, 6, 4)]
     _, alarm = risk.cusum([0, 0, 5, 5, 5], [0, 0, 1, 1, 1], sigma=1)
     assert alarm == 3                                  # z = 4 per step, k = 0.5 -> 3.5, 7.0 > h = 4
+
+
+def test_whoi_sst_falls_back_to_previous_csv(tmp_path, monkeypatch):
+    import fetch_whoi
+    def down(*a, **k):
+        raise OSError("HTTP Error 503: Service Unavailable")
+    monkeypatch.setattr(fetch_whoi, "fetch_sst", down)
+    monkeypatch.setattr(fetch_whoi, "get", down)                       # OISST down too
+    prev = tmp_path / "live.csv"
+    prev.write_text("timestamp,calls,sst_c\n2026-11-25 00:00:00+00:00,1,12.0\n2026-11-25 01:00:00+00:00,0,12.0\n"
+                    "2026-11-26 00:00:00+00:00,2,11.5\n")
+    sst = fetch_whoi.get_sst(pd.Timestamp("2026-11-25", tz="UTC"), 41.95, -70.3, prev)
+    assert list(sst.round(2)) == [12.0, 11.5]

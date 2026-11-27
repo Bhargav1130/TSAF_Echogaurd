@@ -25,6 +25,7 @@ import pandas as pd
 
 BASE = "https://dcs.whoi.edu"
 ERDDAP = "https://coastwatch.pfeg.noaa.gov/erddap/griddap/jplMURSST41.csv"
+OISST = "https://coastwatch.pfeg.noaa.gov/erddap/griddap/ncdcOisst21Agg_LonPM180.csv"
 # one table row: <a id="YYYYmmddHHMMSS"> (UTC; the visible text is EST) then
 # Sei, Fin, Right, Humpback, Other, Duration (listening seconds)
 ROW = re.compile(r'<a id="(\d{14})">[^<]*</a></td>' + r'\s*<td[^>]*>(\d*)</td>' * 6)
@@ -99,6 +100,23 @@ def fetch_sst(start, lat, lon, end=None):
     return pd.Series(df.analysed_sst.to_numpy(), index=pd.to_datetime(df.time, utc=True).dt.floor("D"))
 
 
+def get_sst(start, lat, lon, previous_csv):
+    """MUR SST; if that ERDDAP dataset is down (it often answers 503), NOAA OISST
+    (0.25 deg, ~2 weeks behind); if both fail, the SST already in the previous CSV."""
+    try:
+        return fetch_sst(start, lat, lon)
+    except (OSError, ValueError) as e:
+        print(f"  MUR SST failed ({e}); trying NOAA OISST")
+    try:
+        url = (f"{OISST}?sst%5B({start:%Y-%m-%d}T12:00:00Z):1:(last)%5D%5B(0.0)%5D%5B({lat})%5D%5B({lon})%5D")
+        df = pd.read_csv(StringIO(get(url)), skiprows=[1])
+        return pd.Series(df.sst.to_numpy(), index=pd.to_datetime(df.time, utc=True).dt.floor("D"))
+    except (OSError, ValueError) as e:
+        print(f"  OISST failed too ({e}); keeping the SST from {previous_csv}")
+    old = pd.read_csv(previous_csv, parse_dates=["timestamp"])      # FileNotFoundError: no SST at all, stop
+    return old.set_index(old.timestamp.dt.floor("D")).sst_c.groupby(level=0).mean()
+
+
 def source_note(platform, h):
     return {"name": "WHOI Robots4Whales live buoy detections",
             "note": (f"Real right whale up-calls from the WHOI near real-time buoy {platform.split('/')[0]} "
@@ -129,9 +147,9 @@ def main():
           f"{int(np.nansum(h.calls))} right whale calls")
 
     print("Fetching SST from NOAA ERDDAP ...")
-    sst = fetch_sst(h.index[0], args.lat, args.lon)
+    sst = get_sst(h.index[0], args.lat, args.lon, args.out)
     h["sst_c"] = sst.reindex(h.index.floor("D")).to_numpy()
-    h["sst_c"] = h.sst_c.ffill().bfill().round(2)   # MUR lags 1-2 days: hold the last value
+    h["sst_c"] = h.sst_c.ffill().bfill().round(2)   # SST lags 1-14 days: hold the last value
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     h.to_csv(args.out, index_label="timestamp")
