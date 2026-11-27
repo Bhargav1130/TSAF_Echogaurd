@@ -65,7 +65,10 @@ def to_hourly(tally, min_listen_s=1800):
     part = h.listen_s.between(min_listen_s, 3599)
     h.loc[part, "calls"] = (h.calls[part] * 3600 / h.listen_s[part]).round(1)
     # the newest hour is usually still filling in (the page posts 15-min rows): drop it unless complete
-    return h.loc[:h.index[h.listen_s >= 3600][-1]]
+    full = h.index[h.listen_s >= 3600]
+    if not len(full):
+        raise ValueError("No fully heard hour in the tally: the buoy has not reported a complete hour yet")
+    return h.loc[:full[-1]]
 
 
 def fetch_tally(platform, days, cache_dir):
@@ -101,29 +104,32 @@ def fetch_sst(start, lat, lon, end=None):
 
 
 def get_sst(start, lat, lon, previous_csv):
-    """MUR SST; if that ERDDAP dataset is down (it often answers 503), NOAA OISST
-    (0.25 deg, ~2 weeks behind); if both fail, the SST already in the previous CSV."""
+    """(daily SST, source name). MUR SST; if that ERDDAP dataset is down (it often
+    answers 503), NOAA OISST (0.25 deg, ~2 weeks behind); if both fail, the SST
+    already in the previous CSV."""
     try:
-        return fetch_sst(start, lat, lon)
+        return fetch_sst(start, lat, lon), "NOAA MUR SST v4.1 via ERDDAP"
     except (OSError, ValueError) as e:
         print(f"  MUR SST failed ({e}); trying NOAA OISST")
     try:
         url = (f"{OISST}?sst%5B({start:%Y-%m-%d}T12:00:00Z):1:(last)%5D%5B(0.0)%5D%5B({lat})%5D%5B({lon})%5D")
         df = pd.read_csv(StringIO(get(url)), skiprows=[1])
-        return pd.Series(df.sst.to_numpy(), index=pd.to_datetime(df.time, utc=True).dt.floor("D"))
+        return (pd.Series(df.sst.to_numpy(), index=pd.to_datetime(df.time, utc=True).dt.floor("D")),
+                "NOAA OISST v2.1 via ERDDAP (MUR was unavailable)")
     except (OSError, ValueError) as e:
         print(f"  OISST failed too ({e}); keeping the SST from {previous_csv}")
     old = pd.read_csv(previous_csv, parse_dates=["timestamp"])      # FileNotFoundError: no SST at all, stop
-    return old.set_index(old.timestamp.dt.floor("D")).sst_c.groupby(level=0).mean()
+    return (old.set_index(old.timestamp.dt.floor("D")).sst_c.groupby(level=0).mean(),
+            "kept from the previous download (NOAA ERDDAP was unavailable)")
 
 
-def source_note(platform, h):
+def source_note(platform, h, sst_source="NOAA MUR SST v4.1 via ERDDAP"):
     return {"name": "WHOI Robots4Whales live buoy detections",
             "note": (f"Real right whale up-calls from the WHOI near real-time buoy {platform.split('/')[0]} "
                      f"(Cape Cod Bay by default), {h.index[0]:%d %b} - {h.index[-1]:%d %b %Y %H:%M} UTC, "
                      "counted every 15 minutes by the buoy's automatic detector (Baumgartner lab, WHOI; many periods "
                      "not yet analyst-reviewed) and refreshed hourly. Hours the buoy was not listening are missing, "
-                     "not zero. SST: NOAA MUR via ERDDAP.")}
+                     f"not zero. SST: {sst_source}.")}
 
 
 def main():
@@ -147,14 +153,14 @@ def main():
           f"{int(np.nansum(h.calls))} right whale calls")
 
     print("Fetching SST from NOAA ERDDAP ...")
-    sst = get_sst(h.index[0], args.lat, args.lon, args.out)
+    sst, sst_source = get_sst(h.index[0], args.lat, args.lon, args.out)
     h["sst_c"] = sst.reindex(h.index.floor("D")).to_numpy()
     h["sst_c"] = h.sst_c.ffill().bfill().round(2)   # SST lags 1-14 days: hold the last value
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     h.to_csv(args.out, index_label="timestamp")
     # plain-language source note read by site/build_site.py
-    Path(args.out).with_suffix(".source.json").write_text(json.dumps(source_note(args.platform, h), indent=1),
+    Path(args.out).with_suffix(".source.json").write_text(json.dumps(source_note(args.platform, h, sst_source), indent=1),
                                                           encoding="utf-8")
     print(f"Wrote {args.out}  ({h.index[0]:%Y-%m-%d %H:%M} to {h.index[-1]:%Y-%m-%d %H:%M} UTC)")
     print(f"Next:  python run_all.py --skip-detector --hourly-csv {args.out}")

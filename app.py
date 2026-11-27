@@ -167,6 +167,9 @@ with tab3:
     det = summary.get("detector")
     if det:
         st.caption(f"Clips: {det['source']}")
+        if "SIMULATED" not in summary["data_source"]:
+            st.info("This tab shows how up-calls are found, on labelled clips. The hourly counts being forecast "
+                    "come from the data source's own automatic detector, not from these models.")
         full_width(st.dataframe, pd.DataFrame(det["metrics"]), hide_index=True)
         if (C.FIG_DIR / "detector_pr.png").exists():
             st.image(str(C.FIG_DIR / "detector_pr.png"), width=520)

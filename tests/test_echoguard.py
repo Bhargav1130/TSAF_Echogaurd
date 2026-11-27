@@ -104,7 +104,7 @@ def test_empirical_interval_calibrates_from_past_errors():
         return {"mean": np.full(72, 2.0), "lo": None, "hi": None, "resid": None}
     r = forecast.empirical_interval(run, y, 1500)
     assert sorted(set(calls) - {1500}) == [1500 - 72 * j for j in range(5, 0, -1)]   # only past origins
-    assert r["lo"][0] < 3 < r["hi"][0] and r["hi"][0] - 2.0 > 2.0     # interval shifted up to cover the bias
+    assert r["lo"][0] < 3 < r["hi"][0] and r["hi"][0] - 2.0 >= 2.0    # interval shifted up to cover the bias
     cov = np.mean((y[1500:1572] >= r["lo"]) & (y[1500:1572] <= r["hi"]))
     assert 0.65 < cov < 0.95 and abs(r["err_sd"] - 1) < 0.15
 
@@ -181,8 +181,8 @@ def test_whoi_sst_falls_back_to_previous_csv(tmp_path, monkeypatch):
     prev = tmp_path / "live.csv"
     prev.write_text("timestamp,calls,sst_c\n2026-11-25 00:00:00+00:00,1,12.0\n2026-11-25 01:00:00+00:00,0,12.0\n"
                     "2026-11-26 00:00:00+00:00,2,11.5\n")
-    sst = fetch_whoi.get_sst(pd.Timestamp("2026-11-25", tz="UTC"), 41.95, -70.3, prev)
-    assert list(sst.round(2)) == [12.0, 11.5]
+    sst, src = fetch_whoi.get_sst(pd.Timestamp("2026-11-25", tz="UTC"), 41.95, -70.3, prev)
+    assert list(sst.round(2)) == [12.0, 11.5] and "previous" in src
 
 
 def test_risk_bound_follows_hour_of_day():

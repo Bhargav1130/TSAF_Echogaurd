@@ -812,5 +812,5 @@ heroRisk();
 
 $("#honesty").innerHTML = M.simulated
   ? `The hourly season on this page is <b>simulated</b>: 60 days built to match patterns seen in real buoy data (night-time calling, a rise with sea temperature, persistence and two buoy outages). It is passed through the detector's measured recall and precision, so the forecaster sees what a buoy would report. The detector scores come from <b>real ${M.detector_source}</b> clips. Treat the forecast and risk numbers as a demonstration of the method, not as real measurements.`
-  : `${M.source_note || `The hourly series on this page is <b>real buoy data</b> (${M.source}).`} Risk thresholds are applied to the buoy's own counts; check them against local guidance before relying on them.`;
+  : `${M.source_note || `The hourly series on this page is <b>real buoy data</b> (${M.source}).`} Risk thresholds are applied to the buoy's own counts; check them against local guidance before relying on them. The detector lab runs on ${M.detector_source} clips to show how up-calls are found; the hourly counts themselves come from the data source's own automatic detector.`;
 </script>

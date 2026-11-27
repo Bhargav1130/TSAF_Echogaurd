@@ -103,13 +103,15 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   Run #2 failed on a NOAA MUR SST 503; fetch_whoi.get_sst now falls back to OISST, then the previous CSV's SST.
   Command: `python run_all.py --skip-detector --hourly-csv data/live_hourly.csv` (50 s; counts used as-is, rates 1/1).
 - ADF 0.001 / KPSS 0.01, STL seasonal 0.22 / trend 0.13, ACF24 0.250, peak 01:00 UTC, daily calls vs SST r = -0.65.
-- AIC best SARIMA(2,0,2)(0,0,0)24. 5 folds from hour 1061: SARIMA MAE 7.09 MASE 2.18 cov 82% | SARIMAX 8.24 / 66% |
-  Seasonal naive 8.86 / 72% | HW 10.38 / 51% | Naive 13.54 / 61%. MASE > 1: bursty calls.
+- AIC best SARIMA(2,0,2)(0,0,0)24. 5 folds from hour 1061: SARIMA MAE 7.09 MASE 2.18 cov 78% | SARIMAX 8.24 / 55% |
+  Seasonal naive 8.86 / 70% | HW 10.38 / 49% | Naive 13.54 / 60%. MASE > 1: bursty calls.
 - Live forecast from 27 Nov 09:00 UTC with the risk bound: LOW 26 / MEDIUM 3 / HIGH 43 h, HIGH windows around the
   night-time call peak each day. Backtest last fold: LOW 23 / MEDIUM 6 / HIGH 43, every >= 5-call hour flagged
-  HIGH or MEDIUM, HIGH precision 0.28. Last fold 67/72 inside band. (Old upper-bound rule: HIGH all 72 h.)
-- Interval fix (27 Nov): empirical_interval floors lo / ceils hi (integer counts); before, SARIMA covered 41%.
-  The 2019 numbers below predate it; 2019 outputs backed up in the scratchpad (real2019_outputs).
+  HIGH or MEDIUM, HIGH precision 0.28. Last fold 65/72 inside band. (Old upper-bound rule: HIGH all 72 h.)
+- Interval fix (27 Nov): empirical_interval rounds lo / hi to the NEAREST whole call (integer counts); unrounded,
+  SARIMA covered 41% (lo 0.14 excluded every zero hour). Floor/ceil was tried first and over-covered small counts
+  (simulated 93%, live 82%); nearest gives 88% / 78%. All coverage numbers in this file are with nearest rounding
+  (27 Nov full check: all three data modes re-run, 17 tests pass, app and site load without errors).
 - Website v6 = this run; hero "risk next hour" now uses the live forecast (was the backtest fold).
   Hourly workflow also runs run_all + build_site and deploys site/index.html to GitHub Pages
   (https://bhargav1130.github.io/TSAF_Echogaurd/; needs Settings > Pages > Source: GitHub Actions).
@@ -123,21 +125,22 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   0.642 / 0.614 / 0.568. Peak 23:00 UTC (116 calls/h), low 16:00 (20). Daily calls vs SST r = -0.70 (whales
   leave the bay as it warms; the simulator assumed the opposite).
 - AIC (first 720 h): best SARIMA(1,0,0)(1,0,1)24, AIC 7442.7.
-- 28 folds: SARIMAX (SST) MAE 24.55 RMSE 31.79 MASE 0.60 cov 83% | Seasonal naive 28.39 / 38.82 / 0.70 / 87% |
+- 28 folds: SARIMAX (SST) MAE 24.55 RMSE 31.79 MASE 0.60 cov 84% | Seasonal naive 28.39 / 38.82 / 0.70 / 87% |
   SARIMA 28.41 / 35.43 / 0.70 / 84% | Naive 33.14 / 42.90 / 0.82 / 78% | Holt-Winters 41.46 / 53.48 / 1.02 / 81%.
   On real data SST helps clearly; dashboard model = SARIMAX.
 - Thresholds 10.7 / 9.3 det/h (= 5 / 3.5 real calls/h). Backtest = last fold (issued 08 Jun 2019 18:00 UTC,
-  whales gone): LOW 72 h, 70/72 inside band, CUSUM alarm +10 h. Peak-season folds are only visible in the fold chart.
+  whales gone): LOW 72 h, 71/72 inside band, CUSUM alarm +10 h. Peak-season folds are only visible in the fold chart.
 - Website republished (version 4) from this run. Kaggle-run outputs are backed up in the scratchpad.
 - `fetch_whoi.py` – real data: scrapes WHOI Robots4Whales daily tally pages (15-min right whale counts;
   the row anchor id is the UTC time, visible text is EST), sums per UTC hour, <30 min listening -> NaN,
   adds NOAA MUR SST (ERDDAP jplMURSST41), caches days in data/whoi_cache/. Default buoy: Cape Cod Bay
   `maccb2606/maccb2606_maccb` (deployed 16 Jun 2026). Counts are automatic, often not analyst-reviewed.
   dcs.whoi.edu was unreachable from the user's home network (DNS + route); ERDDAP works.
-  Parser tested with real markup; live WHOI fetch not yet run from this machine.
+  Parser tested with real markup. whoi.edu is blocked on the user's home network, so the fetch runs on GitHub
+  Actions (working since run 45996739028).
   Cloud fetch (whoi.edu blocked here): `.github/workflows/live_whoi.yml` (hourly cron, commits
   data/live_hourly.csv; needs the folder pushed to a GitHub repo) and `colab_live_whoi.ipynb`
-  (upload or clone fetch_whoi.py, run, download live_hourly.csv). Neither run yet. Live file is
+  (upload or clone fetch_whoi.py, run, download live_hourly.csv). The workflow runs; the notebook is a manual backup. Live file is
   data/live_hourly.csv so the 2019 data/buoy_hourly.csv is kept. 60 days < 75 -> last 5 folds.
 
 ## Verified results (simulated season seen through MiniRocket: recall 0.67, precision 0.79)
@@ -146,8 +149,8 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   Daily detections vs SST r = 0.84.
 - AIC grid (first 1056 h): best SARIMA(1,0,1)(1,0,1)24, AIC 2867.9 / BIC 2897.7; all top 5 converged.
 - Walk-forward 5 x 72 h (folds from hour 44*24), empirical 80% intervals:
-  Holt-Winters MAE 1.01 RMSE 1.33 MASE 1.22 cov 85% | SARIMAX 1.04 / 1.34 / 1.27 cov 76% |
-  SARIMA 1.05 / 1.37 / 1.27 cov 82% | Seasonal naive 1.29 / 1.79 / 1.57 cov 85% | Naive 1.80 / 2.10 / 2.19 cov 76%.
+  Holt-Winters MAE 1.01 RMSE 1.33 MASE 1.22 cov 88% | SARIMAX 1.04 / 1.34 / 1.27 cov 89% |
+  SARIMA 1.05 / 1.37 / 1.27 cov 88% | Seasonal naive 1.29 / 1.79 / 1.57 cov 85% | Naive 1.80 / 2.10 / 2.19 cov 87%.
   With no look-ahead, SST adds almost nothing over SARIMA; Holt-Winters is the dashboard model.
 - Residuals (Holt-Winters, last-fold fit, 1319 h): Ljung-Box p < 0.001 (24, 48); Jarque-Bera p < 0.001,
   skew 1.01, excess kurtosis 3.10 -> some structure left, skewed errors (handled by the empirical interval).
@@ -155,13 +158,13 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
 - Detectors on REAL Kaggle clips (5000 of 30 000, 22% up-calls; `--kaggle-dir whale-detection-challenge/whale_data/data`,
   data in the project folder, git-ignored, soundfile 0.14 installed in .venv): MiniRocket PR-AUC 0.760 (P 0.75, R 0.52),
   MFCC logistic 0.599 (R 0.04), energy 0.264. Full run 191 s. Season through those rates: thresholds 2.8 / 2.0 det/h,
-  HW best (MAE 0.93, cov 82%; SARIMA 0.95 / 79%, SARIMAX 0.95 / 69%), LOW 0 / MEDIUM 51 / HIGH 21, CUSUM +27 h. The numbers above are the simulated-clip run.
+  HW best (MAE 0.93, cov 82%; SARIMA 0.95 / 79%, SARIMAX 0.95 / 69%), LOW 0 / MEDIUM 51 / HIGH 21, CUSUM +27 h (before the 27 Nov interval and risk-bound changes). The numbers above are the simulated-clip run.
 - Former main run (26 Nov 2026) = the Kaggle-clip run on the simulated season. Reproduce with
   `python run_all.py --kaggle-dir whale-detection-challenge/whale_data/data --clips 5000`; `--skip-detector` reuses
   its saved rates. Plain `python run_all.py` reruns on simulated clips and overwrites it.
 - Dashboard last fold (issued 26 Apr 2016 00:00 UTC): thresholds HIGH >= 3.5, MEDIUM >= 2.5 detections/h
   (= 5 / 3.5 real calls/h); 34 detections last 24 h, ~96 expected next 72 h; LOW 3 / MEDIUM 57 / HIGH 12 h;
-  HIGH windows +1-5, +25-29, +49-53 h; CUSUM (sigma 1.23) alarm at +25 h; 53/72 inside band.
+  HIGH windows +1-5, +25-29, +49-53 h; CUSUM (sigma 1.23) alarm at +25 h; 58/72 inside band (risk bound rule).
 - History of changes: earlier numbers came from (a) unconverged fits, (b) SARIMAX seeing true future SST,
   (c) Gaussian intervals, (d) true counts instead of detector output.
 

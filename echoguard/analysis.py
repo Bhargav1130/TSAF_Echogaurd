@@ -43,8 +43,9 @@ def daily_profile(y):
 
 
 def sst_correlation(y, sst):
-    """Correlation between daily call totals and daily mean SST."""
-    daily = y.resample("D").sum()
+    """Correlation between daily calls (mean calls/h, so a partly covered first or
+    last day is not counted as a quiet day) and daily mean SST."""
+    daily = y.resample("D").mean()
     s = sst.resample("D").mean().reindex(daily.index)
     ok = s.notna()
     return float(np.corrcoef(daily[ok], s[ok])[0, 1])
