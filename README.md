@@ -31,7 +31,7 @@ pip install -r requirements.txt
 ```bat
 python run_all.py            :: full pipeline, about 2 minutes
 streamlit run app.py         :: opens the dashboard in your browser
-python -m pytest -q          :: 17 checks
+python -m pytest -q          :: 18 checks
 ```
 
 Faster run without the audio stage: `python run_all.py --skip-detector`.
@@ -70,6 +70,23 @@ If your network cannot reach whoi.edu, let a cloud machine fetch it:
 | `forecast_live.csv` | next 72 h after the end of the data |
 | `alerts.csv` | merged HIGH-risk windows |
 | `figures/*.png` | daily calls vs SST, hourly profile, ACF, STL, MASE, forecast, risk strip, residual diagnostics, PR curves |
+
+## Current results (27 Nov 2026)
+
+Use these numbers when updating the report and paper. 80 % coverage = share of actual hours inside the 80 % band
+(target 0.80). Risk = LOW / MEDIUM / HIGH from the risk bound (75 % quantile of forecast + past errors at the same
+hour of day), thresholds 5 / 3.5 real calls/h.
+
+| Data | Best model | MAE | MASE | 80 % coverage | Risk check |
+|---|---|---|---|---|---|
+| **Live** WHOI Cape Cod Bay buoy, 29 Sep - 27 Nov 2026 12:00 UTC, 5 folds | SARIMA(2,0,2) | 6.97 | 2.15 | 87 % | last fold LOW 24 / MEDIUM 6 / HIGH 42 h; all 12 hours with >= 5 calls flagged |
+| **Real** Cape Cod Bay 2019 (DCLDE), 28 folds | SARIMAX with SST | 24.55 | 0.60 | 85 % | over all 28 folds: 75 % of HIGH hours were busy, 98 % of busy hours caught |
+| **Simulated** 60-day season through MiniRocket (illustration only) | Holt-Winters | 1.01 | 1.22 | 88 % | last fold LOW 54 / MEDIUM 6 / HIGH 12 h |
+
+Detectors on 5000 real Kaggle clips: MiniRocket PR-AUC 0.76 (precision 0.75, recall 0.52), MFCC + logistic
+regression 0.60, energy threshold 0.26. On the bursty live data an hourly forecast 72 h ahead is only modestly
+better than the average daily pattern (about 39 % of HIGH hours busy against a 29 % base rate); the naive baseline (MAE 6.62)
+is as good as the fitted models there, and the live numbers change every hour. On the 2019 season, with a strong daily cycle and steady presence, it works well (MASE 0.60).
 
 ## Data
 

@@ -69,3 +69,30 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Backup clock: GitHub's cron can be delayed for hours or skipped (on this repo it had not fired once
+  # 5 h after setup). Each push, manual or chained run waits until :23 of the next hour and starts the next run.
+  # The chain stops by itself once real scheduled runs appear, and only the oldest chain survives.
+  next:
+    needs: deploy
+    if: always() && github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Wait for the next hour, then start the next run
+        run: |
+          now=$(date +%s); wait=$(( (3600 - now % 3600 + 23 * 60) % 3600 ))
+          [ "$wait" -lt 600 ] && wait=$(( wait + 3600 ))
+          echo "sleeping $wait s"; sleep "$wait"
+          wf=live_whoi.yml
+          recent_sched=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/runs?event=schedule&per_page=1" \
+            --jq "[.workflow_runs[] | select((now - (.created_at | fromdateiso8601)) < 7200)] | length")
+          others=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/runs?per_page=20" \
+            --jq "[.workflow_runs[] | select(.status != \"completed\" and .id != $GITHUB_RUN_ID and (.id < $GITHUB_RUN_ID or .status == \"queued\"))] | length")
+          if [ "$recent_sched" -gt 0 ]; then echo "GitHub cron is running: backup clock stops"; exit 0; fi
+          if [ "$others" -gt 0 ]; then echo "another run is active or queued: not starting a duplicate"; exit 0; fi
+          gh workflow run "$wf" --ref main -R "$GITHUB_REPOSITORY" && echo "next run started"

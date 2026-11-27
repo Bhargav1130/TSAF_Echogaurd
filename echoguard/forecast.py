@@ -152,11 +152,11 @@ def empirical_interval(run, y, s, h=C.HORIZON, n_cal=C.N_CAL, alpha=C.INTERVAL_A
         raise ValueError("Not enough history before the origin to calibrate the interval")
     q_lo, q_hi = np.quantile(errs, [alpha / 2, 1 - alpha / 2])
     r = dict(run(s))
-    # calls are whole numbers: round the band to whole calls, else a lower bound of 0.14 calls/h
-    # leaves every zero-call hour outside it (sparse live WHOI data: 80% band covered 41%).
-    # Nearest, not outwards: floor/ceil over-covered small counts (simulated season 93%, live 82%;
-    # nearest gives 88% / 78%).
-    r.update(lo=np.round(np.clip(r["mean"] + q_lo, 0, None)), hi=np.round(r["mean"] + q_hi),
+    # calls are whole numbers. Lower bound DOWN: a raw bound of 0.14 (or a nearest-rounded 1) leaves every
+    # zero-call hour outside the band, and 57% of live hours are zero (coverage fell to 41-47%).
+    # Upper bound to the NEAREST call: ceil over-covered small counts. Tested over live, simulated and
+    # 2019 folds: floor/round 87 / 88 / 85% (worst fold 72%), round/round 71% (worst 46%), floor/ceil 88 / 93 / 85%.
+    r.update(lo=np.floor(np.clip(r["mean"] + q_lo, 0, None)), hi=np.round(r["mean"] + q_hi),
              err_sd=float(errs.std()), n_cal=len(cal),
              risk=risk_bound(r["mean"], y, run, cal, h))
     return r

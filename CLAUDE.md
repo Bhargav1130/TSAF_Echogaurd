@@ -27,7 +27,7 @@ pip install -r requirements.txt
 python run_all.py              :: full pipeline, ~2 min (incl. ~35 s AIC grid), writes outputs/
 python run_all.py --skip-detector
 streamlit run app.py           :: dashboard
-python -m pytest -q            :: 17 tests
+python -m pytest -q            :: 18 tests
 python fetch_whoi.py           :: real near real-time WHOI buoy data -> data/buoy_hourly.csv
 ```
 Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
@@ -73,7 +73,7 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   standardised by err_sd (std of past 72-h forecast errors), not by the raw series std. Advice text.
   A threshold relative to the recent mean was tried and rejected: it rises in busy periods and hides alerts.
 - `plots.py`, `run_all.py` (orchestrates 5 stages, writes outputs/*.csv, summary.json, figures/), `app.py` (Streamlit;
-  `full_width()` helper; slider defaults come from summary.json risk.thresholds), `tests/test_echoguard.py` (17).
+  `full_width()` helper; slider defaults come from summary.json risk.thresholds), `tests/test_echoguard.py` (18).
 - `site/` – interactive showcase website. `template.html` (page + D3 7.8.5 from cdnjs with SRI) and
   `build_site.py`, which injects outputs/ data and writes `echoguard.html` (Artifact body, published at
   https://claude.ai/artifact/C775C6y5j4wpnjGLhD6shn — republish that file to keep the URL) and `index.html`
@@ -98,24 +98,29 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   "detector_rates"; data/buoy_hourly.source.json (from fetch_dclde) gives the site its source note.
 
 ## Verified results — LIVE WHOI Cape Cod Bay (CURRENT outputs/, 27 Nov 2026)
-- Data: GitHub Actions run 45996739028 (12:12 UTC) -> data/live_hourly.csv, 29 Sep - 27 Nov 2026 08:00 UTC,
-  1421 h, 4593 calls, 17 h offline. Partly heard hours scaled to calls/h, unfinished newest hour dropped.
+- Data: GitHub Actions push run 46035400917 (16:39 UTC) -> data/live_hourly.csv, 29 Sep - 27 Nov 2026 12:00 UTC,
+  1425 h. Partly heard hours scaled to calls/h, unfinished newest hour dropped. Refreshed hourly, so numbers drift.
   Run #2 failed on a NOAA MUR SST 503; fetch_whoi.get_sst now falls back to OISST, then the previous CSV's SST.
   Command: `python run_all.py --skip-detector --hourly-csv data/live_hourly.csv` (50 s; counts used as-is, rates 1/1).
 - ADF 0.001 / KPSS 0.01, STL seasonal 0.22 / trend 0.13, ACF24 0.250, peak 01:00 UTC, daily calls vs SST r = -0.65.
-- AIC best SARIMA(2,0,2)(0,0,0)24. 5 folds from hour 1061: SARIMA MAE 7.09 MASE 2.18 cov 78% | SARIMAX 8.24 / 55% |
-  Seasonal naive 8.86 / 70% | HW 10.38 / 49% | Naive 13.54 / 60%. MASE > 1: bursty calls.
-- Live forecast from 27 Nov 09:00 UTC with the risk bound: LOW 26 / MEDIUM 3 / HIGH 43 h, HIGH windows around the
-  night-time call peak each day. Backtest last fold: LOW 23 / MEDIUM 6 / HIGH 43, every >= 5-call hour flagged
-  HIGH or MEDIUM, HIGH precision 0.28. Last fold 65/72 inside band. (Old upper-bound rule: HIGH all 72 h.)
-- Interval fix (27 Nov): empirical_interval rounds lo / hi to the NEAREST whole call (integer counts); unrounded,
-  SARIMA covered 41% (lo 0.14 excluded every zero hour). Floor/ceil was tried first and over-covered small counts
-  (simulated 93%, live 82%); nearest gives 88% / 78%. All coverage numbers in this file are with nearest rounding
-  (27 Nov full check: all three data modes re-run, 17 tests pass, app and site load without errors).
+- AIC best SARIMA(2,0,2)(0,0,0)24. 5 folds (data to 12:00 UTC): Naive MAE 6.62 / 84% | SARIMA 6.97 MASE 2.15 cov 87% |
+  HW 7.00 / 85% | SARIMAX 8.13 / 62% | Seasonal naive 8.43 / 74%. Bursty calls: baselines are as good as the models
+  and the ranking changes as new hours arrive (with data to 08:00 SARIMA had the lowest MAE). Dashboard model is
+  the best fitted model (baselines excluded) = SARIMA.
+- Backtest last fold with the risk bound: LOW 24 / MEDIUM 6 / HIGH 42 h, HIGH windows around the night-time call
+  peak each day; all 12 hours with >= 5 calls flagged HIGH or MEDIUM, HIGH precision 0.29 (base 0.17).
+  Last fold 69/72 inside band. (Old upper-bound rule: HIGH all 72 h.)
+- Interval fix (27 Nov): empirical_interval floors lo and rounds hi to the nearest call (integer counts). Unrounded,
+  SARIMA covered 41-47% (lo 0.14 excluded every zero hour; 57% of live hours are zero). Tested over live, simulated
+  and 2019 folds: floor/round 87 / 88 / 85% (worst fold 72%), round/round 71% (worst 46%), floor/ceil 88 / 93 / 85%.
+  (27 Nov full check: all three data modes re-run, 18 tests pass, app and site load without errors).
 - Website v6 = this run; hero "risk next hour" now uses the live forecast (was the backtest fold).
   Hourly workflow also runs run_all + build_site and deploys site/index.html to GitHub Pages
   (https://bhargav1130.github.io/TSAF_Echogaurd/; needs Settings > Pages > Source: GitHub Actions).
-  The Claude Artifact copy still needs a manual republish. With --skip-detector, run_all now reads
+  The Claude Artifact copy still needs a manual republish (version 10 = 27 Nov full check).
+  GitHub cron had not fired once 5 h after setup, so the workflow also runs on every push to main and has a
+  `next` job (backup clock): each non-schedule run sleeps to :23 of the next hour and dispatches the next run;
+  it stops once real scheduled runs appear, and only the oldest chain survives (no duplicates). With --skip-detector, run_all now reads
   outputs/detector_metrics.csv (kept in git, has a source column) so the detector section is filled.
 
 ## Verified results — REAL Cape Cod Bay 2019 (main results until 27 Nov 2026)
@@ -125,9 +130,11 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   0.642 / 0.614 / 0.568. Peak 23:00 UTC (116 calls/h), low 16:00 (20). Daily calls vs SST r = -0.70 (whales
   leave the bay as it warms; the simulator assumed the opposite).
 - AIC (first 720 h): best SARIMA(1,0,0)(1,0,1)24, AIC 7442.7.
-- 28 folds: SARIMAX (SST) MAE 24.55 RMSE 31.79 MASE 0.60 cov 84% | Seasonal naive 28.39 / 38.82 / 0.70 / 87% |
-  SARIMA 28.41 / 35.43 / 0.70 / 84% | Naive 33.14 / 42.90 / 0.82 / 78% | Holt-Winters 41.46 / 53.48 / 1.02 / 81%.
-  On real data SST helps clearly; dashboard model = SARIMAX.
+- 28 folds: SARIMAX (SST) MAE 24.55 RMSE 31.79 MASE 0.60 cov 85% | Seasonal naive 28.39 / 38.82 / 0.70 / 87% |
+  SARIMA 28.41 / 35.43 / 0.70 / 86% | Naive 33.14 / 42.90 / 0.82 / 79% |
+  Holt-Winters 41.46 / 53.48 / 1.02 / 82%. On real data SST helps clearly; dashboard model = SARIMAX.
+  Risk-bound check over all 28 folds (SARIMA(1,0,0)(1,0,1)24, thresholds 12.3 / 11.0 det/h, base rate 0.45):
+  new rule HIGH 59% of hours, precision 0.75, recall 0.98; old upper-80% rule HIGH 67%, precision 0.67, recall 0.99.
 - Thresholds 10.7 / 9.3 det/h (= 5 / 3.5 real calls/h). Backtest = last fold (issued 08 Jun 2019 18:00 UTC,
   whales gone): LOW 72 h, 71/72 inside band, CUSUM alarm +10 h. Peak-season folds are only visible in the fold chart.
 - Website republished (version 4) from this run. Kaggle-run outputs are backed up in the scratchpad.
@@ -149,8 +156,8 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   Daily detections vs SST r = 0.84.
 - AIC grid (first 1056 h): best SARIMA(1,0,1)(1,0,1)24, AIC 2867.9 / BIC 2897.7; all top 5 converged.
 - Walk-forward 5 x 72 h (folds from hour 44*24), empirical 80% intervals:
-  Holt-Winters MAE 1.01 RMSE 1.33 MASE 1.22 cov 88% | SARIMAX 1.04 / 1.34 / 1.27 cov 89% |
-  SARIMA 1.05 / 1.37 / 1.27 cov 88% | Seasonal naive 1.29 / 1.79 / 1.57 cov 85% | Naive 1.80 / 2.10 / 2.19 cov 87%.
+  Holt-Winters MAE 1.01 RMSE 1.33 MASE 1.22 cov 88% | SARIMAX 1.04 / 1.34 / 1.27 cov 90% |
+  SARIMA 1.05 / 1.37 / 1.27 cov 88% | Seasonal naive 1.29 / 1.79 / 1.57 cov 89% | Naive 1.80 / 2.10 / 2.19 cov 87%.
   With no look-ahead, SST adds almost nothing over SARIMA; Holt-Winters is the dashboard model.
 - Residuals (Holt-Winters, last-fold fit, 1319 h): Ljung-Box p < 0.001 (24, 48); Jarque-Bera p < 0.001,
   skew 1.01, excess kurtosis 3.10 -> some structure left, skewed errors (handled by the empirical interval).
@@ -164,11 +171,12 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   its saved rates. Plain `python run_all.py` reruns on simulated clips and overwrites it.
 - Dashboard last fold (issued 26 Apr 2016 00:00 UTC): thresholds HIGH >= 3.5, MEDIUM >= 2.5 detections/h
   (= 5 / 3.5 real calls/h); 34 detections last 24 h, ~96 expected next 72 h; LOW 3 / MEDIUM 57 / HIGH 12 h;
-  HIGH windows +1-5, +25-29, +49-53 h; CUSUM (sigma 1.23) alarm at +25 h; 58/72 inside band (risk bound rule).
+  HIGH windows +1-5, +25-29, +49-53 h; CUSUM (sigma 1.23) alarm at +25 h; 60/72 inside band (risk bound rule).
 - History of changes: earlier numbers came from (a) unconverged fits, (b) SARIMAX seeing true future SST,
   (c) Gaussian intervals, (d) true counts instead of detector output.
 
 ## Known mismatches with the written report / paper
+- README "Current results" has the numbers to paste in.
 - Every forecasting and risk number in the report/paper is outdated (they say 14/48/10, 183 calls, 44/72,
   SARIMA best). Current: see "Verified results". The method also changed: AIC order search, empirical
   intervals, no SST look-ahead, detector-in-the-loop series, residual diagnostics, CUSUM sigma.

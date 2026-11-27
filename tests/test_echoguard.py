@@ -196,3 +196,14 @@ def test_risk_bound_follows_hour_of_day():
     assert r["risk"][1] >= 5 and r["risk"][25] >= 5 and r["risk"][0] < 3.5 and r["risk"][2] < 3.5
     lv = risk.risk_levels(r["risk"], 5.0, 3.5)
     assert (lv == "HIGH").sum() == 3                               # one HIGH hour per day
+
+
+def test_band_keeps_zero_hours_on_zero_heavy_counts():
+    # bursty counts like the live WHOI buoy: most hours 0, a few large bursts
+    rng = np.random.default_rng(2)
+    y = np.where(rng.random(2000) < 0.6, 0.0, rng.poisson(8, 2000).astype(float))
+    def run(s):
+        return {"mean": np.full(72, 3.3), "lo": None, "hi": None, "resid": None}
+    r = forecast.empirical_interval(run, y, 1500)
+    assert (r["lo"] == 0).all()                                    # zero-call hours stay inside the band
+    assert np.mean((y[1500:1572] >= r["lo"]) & (y[1500:1572] <= r["hi"])) >= 0.7
