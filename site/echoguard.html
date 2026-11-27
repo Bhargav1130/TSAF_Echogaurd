@@ -1,0 +1,814 @@
+<title>EchoGuard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one water column read top to bottom — a ship's-bridge instrument panel on nautical-chart paper.
+   Dark "scope" panels stay dark in both themes, like real instrument screens. */
+:root {
+  --bg: #eaf0ef; --surface: #f7faf9; --ink: #0e2230; --muted: #566a73; --rule: #c6d2d1;
+  --accent: #0d6b88; --call: #c97414; --scope: #07131b; --scope-ink: #cfe2e8; --scope-dim: #8aa6b1;
+  --low: #2c8656; --med: #b98010; --high: #c13d36; --heat-lo: #f7faf9; --heat-hi: #0d6b88;
+  --f-display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #07141c; --surface: #0d1e29; --ink: #e2ebee; --muted: #8ea4ad; --rule: #1f3543;
+  --accent: #4db3cf; --call: #f0a347; --low: #4cb27d; --med: #e2aa34; --high: #e8594f;
+  --heat-lo: #0d1e29; --heat-hi: #4db3cf; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #07141c; --surface: #0d1e29; --ink: #e2ebee; --muted: #8ea4ad; --rule: #1f3543;
+  --accent: #4db3cf; --call: #f0a347; --low: #4cb27d; --med: #e2aa34; --high: #e8594f;
+  --heat-lo: #0d1e29; --heat-hi: #4db3cf; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--f-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg) }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 800; letter-spacing: .01em; line-height: 1; text-wrap: balance; margin: 0 }
+h2 { font-size: clamp(2rem, 4.5vw, 3.2rem); text-transform: uppercase }
+h3 { font-size: 1.35rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em }
+p { margin: 0; max-width: 66ch }
+.mono, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums }
+.eyebrow { font: 500 .72rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .14em; color: var(--accent) }
+.muted { color: var(--muted) }
+a { color: var(--accent) }
+:focus-visible { outline: 2px solid var(--call); outline-offset: 2px }
+
+/* nav */
+.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--rule) }
+.nav .wrap { display: flex; align-items: center; gap: 18px; padding-block: 10px; overflow-x: auto; scrollbar-width: none }
+.brand { font: 800 1.25rem/1 var(--f-display); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; color: var(--ink); text-decoration: none }
+.nav nav { display: flex; gap: 14px; margin-left: auto }
+.nav nav a { font: 500 .72rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); text-decoration: none; white-space: nowrap }
+.nav nav a:hover { color: var(--ink) }
+
+section { padding-block: clamp(48px, 8vw, 88px); border-bottom: 1px solid var(--rule) }
+.sec-head { display: grid; gap: 12px; margin-bottom: 28px }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 24px; align-items: start }
+.grid2 > * { min-width: 0 }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r); padding: 18px }
+.scope { background: var(--scope); color: var(--scope-ink); border-radius: var(--r); overflow: hidden; position: relative }
+.chart { width: 100%; display: block }
+.chart text { fill: var(--muted); font: 11px var(--f-mono) }
+.chart .domain, .chart .tick line { stroke: var(--rule) }
+
+/* hero */
+.hero { padding-block: clamp(32px, 6vw, 64px) clamp(40px, 6vw, 72px) }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: clamp(20px, 4vw, 48px); align-items: center }
+@media (max-width: 820px) { .hero .wrap { grid-template-columns: 1fr } }
+.hero h1 { font-size: clamp(4rem, 11vw, 8.4rem); text-transform: uppercase; letter-spacing: -.005em }
+.hero h1 span { color: var(--accent) }
+.lede { font-size: 1.12rem; margin-top: 14px }
+.readout { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px }
+.chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--rule); background: var(--surface); border-radius: 999px; padding: 6px 12px; font: 500 .76rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .06em }
+.dot { width: 9px; height: 9px; border-radius: 50% }
+.risk-now { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; align-items: center; margin-top: 22px; padding: 16px 18px; border-radius: var(--r); border: 1px solid var(--rule); background: var(--surface); max-width: 460px }
+.risk-badge { grid-row: span 2; font: 800 2.4rem/1 var(--f-display); letter-spacing: .03em; color: #fff; padding: 12px 16px; border-radius: 4px }
+#waterfall { width: 100%; height: clamp(260px, 34vw, 380px); display: block }
+.scope-cap { padding: 9px 12px 10px; border-top: 1px solid #1a3340; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font: 500 .7rem/1.3 var(--f-mono); color: var(--scope-dim); text-transform: uppercase; letter-spacing: .08em; pointer-events: none }
+.scope-cap b { color: var(--scope-ink); font-weight: 500 }
+.flash { position: absolute; top: 12px; right: 12px; font: 500 .72rem/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--scope); background: var(--call); padding: 6px 9px; border-radius: 3px; opacity: 0; transition: opacity .4s }
+.flash.on { opacity: 1 }
+.scope-tools { position: absolute; top: 10px; left: 12px; display: flex; gap: 6px }
+.btn { font: 500 .74rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .08em; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); padding: 8px 11px; border-radius: 4px; cursor: pointer }
+.btn:hover { border-color: var(--accent) }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+.scope .btn { background: transparent; color: var(--scope-ink); border-color: #23404f }
+.scope .btn[aria-pressed="true"] { background: var(--scope-ink); color: var(--scope) }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 6px }
+
+/* pipeline */
+.pipe { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; position: relative }
+@media (max-width: 760px) { .pipe { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+.stage { text-align: left; border: 1px solid var(--rule); background: var(--surface); border-radius: var(--r); padding: 14px; cursor: pointer; color: var(--ink); font: inherit; display: grid; gap: 6px; position: relative; overflow: hidden }
+.stage .n { font: 500 .72rem/1 var(--f-mono); color: var(--muted); letter-spacing: .1em }
+.stage b { font: 600 1.25rem/1 var(--f-display); text-transform: uppercase; letter-spacing: .03em }
+.stage span { font-size: .82rem; color: var(--muted) }
+.stage[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent) }
+.stage::after { content: ""; position: absolute; left: -40%; top: 0; width: 40%; height: 2px; background: var(--call); opacity: .9; animation: pulse 6s linear infinite; animation-delay: calc(var(--i) * 1s) }
+@keyframes pulse { 0% { left: -40% } 16% { left: 100% } 100% { left: 100% } }
+.stage-detail { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 20px; align-items: start }
+@media (max-width: 760px) { .stage-detail { grid-template-columns: 1fr } }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px }
+.fact { border-left: 2px solid var(--accent); padding: 2px 0 2px 10px }
+.fact .v { font: 600 1.5rem/1.1 var(--f-mono); font-variant-numeric: tabular-nums }
+.fact .k { font-size: .78rem; color: var(--muted) }
+
+/* tables */
+.tbl-wrap { overflow-x: auto }
+table { border-collapse: collapse; width: 100%; font-size: .86rem }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap }
+th { font: 500 .7rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted) }
+td.num, th.num { text-align: right }
+
+.controls { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: end; margin-bottom: 14px }
+.ctl { display: grid; gap: 4px; min-width: 0 }
+.ctl label { font: 500 .7rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted) }
+.ctl output { font: 500 .85rem/1 var(--f-mono) }
+input[type=range] { width: min(240px, 100%); accent-color: var(--accent) }
+.tip { position: fixed; pointer-events: none; z-index: 20; background: var(--ink); color: var(--bg); font: .76rem/1.45 var(--f-mono); padding: 7px 9px; border-radius: 4px; opacity: 0; transition: opacity .12s; max-width: 260px }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font: .74rem/1 var(--f-mono); color: var(--muted); margin-top: 8px }
+.legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 6px }
+
+/* forecast */
+.strip { display: grid; grid-template-columns: repeat(72, minmax(0, 1fr)); gap: 1px; margin-top: 10px }
+.strip button { height: 30px; border: 0; padding: 0; cursor: pointer; border-radius: 1px }
+.strip button.cur { outline: 2px solid var(--ink); outline-offset: 1px; position: relative; z-index: 1 }
+.ticks72 { display: flex; justify-content: space-between; font: .74rem var(--f-mono); color: var(--muted); margin-top: 4px }
+.console { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: baseline }
+.console dt { font: 500 .7rem/1.6 var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted) }
+.console dd { margin: 0; font: 500 .95rem/1.4 var(--f-mono); font-variant-numeric: tabular-nums }
+.advice { margin-top: 14px; padding: 12px 14px; border-radius: 4px; color: #fff; font-weight: 500 }
+.alerts { display: grid; gap: 6px; margin-top: 10px }
+.alerts div { display: flex; justify-content: space-between; gap: 10px; font: .82rem var(--f-mono); border-bottom: 1px dashed var(--rule); padding-bottom: 8px }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px }
+.stat { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r); padding: 12px 14px }
+.stat .v { font: 600 1.35rem/1.1 var(--f-mono); font-variant-numeric: tabular-nums }
+.stat .k { font-size: .78rem; color: var(--muted) }
+.pill { display: inline-block; font: 500 .72rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .08em; padding: 5px 10px; border-radius: 999px; border: 1px solid currentColor; margin-top: 8px }
+.ok { color: var(--low) } .warn { color: var(--med) } .bad { color: var(--high) }
+.note { font-size: .86rem; color: var(--muted); margin-top: 10px }
+footer { padding-block: 48px 64px }
+.team { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-top: 18px }
+.team div { border-top: 1px solid var(--rule); padding-top: 8px }
+@media (prefers-reduced-motion: reduce) { .stage::after { animation: none; display: none } * { transition: none !important } }
+</style>
+
+<header class="nav"><div class="wrap">
+  <a class="brand" href="#top">EchoGuard</a>
+  <nav aria-label="Sections">
+    <a href="#pipeline">Pipeline</a><a href="#detector">Detector</a><a href="#season">Season</a>
+    <a href="#analysis">Analysis</a><a href="#models">Models</a><a href="#forecast">Forecast</a><a href="#diagnostics">Diagnostics</a>
+  </nav>
+</div></header>
+
+<main id="top">
+<div class="hero"><div class="wrap">
+  <div>
+    <h1>Echo<span>Guard</span></h1>
+    <p class="lede">Hydrophone buoys hear North Atlantic right whales calling. EchoGuard counts those up-calls hour by hour, forecasts the next 72 hours and turns the forecast into a LOW / MEDIUM / HIGH warning for ships.</p>
+    <div class="risk-now" id="riskNow"></div>
+    <div class="readout" id="heroChips"></div>
+    <p class="note mono">Time Series Analysis and Forecasting (CS3216) · RV University</p>
+  </div>
+  <div class="scope" role="img" aria-label="Live spectrogram: frequency 0 to 500 hertz against time, with right whale up-calls rising through the 50 to 250 hertz band">
+    <canvas id="waterfall"></canvas>
+    <div class="scope-tools">
+      <button class="btn" id="pauseBtn" aria-pressed="false">Pause</button>
+      <button class="btn" id="soundBtn">Hear an up-call</button>
+    </div>
+    <div class="flash" id="flash">Up-call · 50→250 Hz</div>
+    <div class="scope-cap"><span>Spectrogram · <b>0–500 Hz</b> · band <b>50–250 Hz</b></span><span>Up-calls heard: <b id="callCount">0</b></span></div>
+  </div>
+</div></div>
+
+<section id="pipeline"><div class="wrap">
+  <div class="sec-head">
+    <div class="eyebrow">From sound to warning</div>
+    <h2>Six stations, one signal</h2>
+    <p class="muted">Each station hands its output to the next. Pick one to see what it does and what it measured on this run.</p>
+  </div>
+  <div class="pipe" id="pipe"></div>
+  <div class="panel stage-detail" id="stageDetail"></div>
+</div></section>
+
+<section id="detector"><div class="wrap">
+  <div class="sec-head">
+    <div class="eyebrow">Station 2 · Detect</div>
+    <h2>Rising, not loud</h2>
+    <p class="muted">An up-call is a sweep that rises through 50–250 Hz in about a second. Ship noise and falling sweeps can be just as loud, so loudness alone fails. EchoGuard's detector reads each 2-second window's frequency contour: the loudest frequency in the band, frame by frame. Try it below; this spectrogram is computed in your browser with a real FFT.</p>
+  </div>
+  <div class="grid2">
+    <div>
+      <div class="controls">
+        <div class="ctl"><label>Clip</label><div class="seg" id="clipSeg">
+          <button class="btn" data-k="up" aria-pressed="true">Up-call</button>
+          <button class="btn" data-k="down" aria-pressed="false">Falling sweep</button>
+          <button class="btn" data-k="ship" aria-pressed="false">Ship + noise</button></div></div>
+        <div class="ctl"><label for="snr">Signal-to-noise <output id="snrOut"></output></label><input type="range" id="snr" min="0.15" max="1.5" step="0.05" value="0.8"></div>
+        <button class="btn" id="reroll">New noise</button>
+      </div>
+      <div class="scope"><canvas id="lab" class="chart" style="height:260px"></canvas></div>
+      <div class="legend"><span><i style="background:var(--call)"></i>dominant-frequency contour (50–250 Hz)</span><span id="labVerdict" class="mono"></span></div>
+    </div>
+    <div>
+      <h3>Detectors on real Kaggle clips</h3>
+      <p class="note" id="detNote"></p>
+      <div class="controls" style="margin-top:12px"><div class="seg" id="detSeg">
+        <button class="btn" data-k="pr_auc" aria-pressed="true">PR-AUC</button>
+        <button class="btn" data-k="precision" aria-pressed="false">Precision</button>
+        <button class="btn" data-k="recall" aria-pressed="false">Recall</button></div></div>
+      <svg id="detChart" class="chart" height="190"></svg>
+      <p class="note">The threshold is set on validation clips so that at least 80% of detections are real calls; precision and recall are then measured on unseen test clips.</p>
+    </div>
+  </div>
+</div></section>
+
+<section id="season"><div class="wrap">
+  <div class="sec-head">
+    <div class="eyebrow">Station 3 · Count</div>
+    <h2 id="seasonTitle">Sixty days at the buoy</h2>
+    <p class="muted" id="seasonLede"></p>
+  </div>
+  <div class="controls">
+    <div class="ctl"><label>Show</label><div class="seg">
+      <button class="btn" id="trueToggle" aria-pressed="false">True calls behind the detections</button></div></div>
+    <span class="note" style="margin:0">Drag across the lower strip to zoom.</span>
+  </div>
+  <svg id="seasonChart" class="chart" height="300"></svg>
+  <svg id="seasonBrush" class="chart" height="64"></svg>
+  <div class="legend"><span><i style="background:var(--accent)"></i>detections / hour</span><span><i style="background:var(--call)"></i>sea-surface temperature (°C)</span><span><i style="background:var(--muted)"></i>true calls</span><span><i style="background:var(--rule);height:9px"></i>buoy offline</span></div>
+  <div class="grid2" style="margin-top:36px">
+    <div>
+      <h3>Day × hour</h3>
+      <p class="note">Each column is a day, each row an hour (UTC). The night band shows the daily calling cycle; the brighter right side shows the season building.</p>
+      <svg id="heat" class="chart" height="230"></svg>
+    </div>
+    <div>
+      <h3>Average day</h3>
+      <p class="note" id="profileNote"></p>
+      <svg id="profile" class="chart" height="230"></svg>
+    </div>
+  </div>
+</div></section>
+
+<section id="analysis"><div class="wrap">
+  <div class="sec-head">
+    <div class="eyebrow">Station 4 · Analyse</div>
+    <h2>What kind of series is this?</h2>
+    <p class="muted">Before forecasting, the series is tested for stationarity, decomposed and checked for memory. These results decide the model form: no differencing (d = 0) and a 24-hour season.</p>
+  </div>
+  <div class="stats" id="anaStats"></div>
+  <h3>Autocorrelation, lags 1–72 h</h3>
+  <p class="note">Bars outside the shaded 95% band are real memory. Peaks at 24, 48 and 72 h are the daily cycle repeating.</p>
+  <svg id="acf" class="chart" height="230"></svg>
+</div></section>
+
+<section id="models"><div class="wrap">
+  <div class="sec-head">
+    <div class="eyebrow">Station 5 · Forecast</div>
+    <h2>Choosing and testing models</h2>
+    <p class="muted" id="modelsLede"></p>
+  </div>
+  <div class="grid2">
+    <div>
+      <h3>SARIMA order search by AIC</h3>
+      <p class="note" id="aicNote"></p>
+      <div id="aicGrid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px"></div>
+      <p class="mono note" id="aicRead">Hover a cell.</p>
+    </div>
+    <div>
+      <h3>Walk-forward results</h3>
+      <div class="controls" style="margin-top:12px"><div class="seg" id="metSeg">
+        <button class="btn" data-k="mae" aria-pressed="true">MAE</button>
+        <button class="btn" data-k="rmse" aria-pressed="false">RMSE</button>
+        <button class="btn" data-k="mase" aria-pressed="false">MASE</button>
+        <button class="btn" data-k="coverage80" aria-pressed="false">80% coverage</button></div></div>
+      <svg id="metChart" class="chart" height="220"></svg>
+      <p class="note" id="metNote"></p>
+      <h3 style="margin-top:24px">MAE fold by fold</h3>
+      <svg id="foldChart" class="chart" height="200"></svg>
+      <div class="legend" id="foldLegend"></div>
+    </div>
+  </div>
+</div></section>
+
+<section id="forecast"><div class="wrap">
+  <div class="sec-head">
+    <div class="eyebrow">Station 6 · Warn</div>
+    <h2>The next 72 hours</h2>
+    <p class="muted">Risk comes from the upper edge of the 80% band: a missed whale costs more than an extra alert. Scrub through the hours, play the forecast, or move the thresholds and watch the warnings change.</p>
+  </div>
+  <div class="controls">
+    <div class="ctl"><label>Forecast</label><div class="seg" id="modeSeg">
+      <button class="btn" data-k="backtest" aria-pressed="true">Backtest (with actuals)</button>
+      <button class="btn" data-k="live" aria-pressed="false">Live (after the data)</button></div></div>
+    <div class="ctl"><label for="thHigh">HIGH if upper ≥ <output id="thHighOut"></output></label><input type="range" id="thHigh" min="0.5" max="8" step="0.1"></div>
+    <div class="ctl"><label for="thMed">MEDIUM if upper ≥ <output id="thMedOut"></output></label><input type="range" id="thMed" min="0.3" max="8" step="0.1"></div>
+    <button class="btn" id="thReset">Reset thresholds</button>
+  </div>
+  <svg id="fcChart" class="chart" height="320"></svg>
+  <div class="strip" id="strip" aria-label="Risk for each of the next 72 hours"></div>
+  <div class="ticks72"><span>+1 h</span><span>+24 h</span><span>+48 h</span><span>+72 h</span></div>
+  <div class="controls" style="margin-top:14px">
+    <div class="ctl"><label for="scrub">Hour ahead <output id="scrubOut"></output></label><input type="range" id="scrub" min="1" max="72" step="1" value="1" style="width:min(420px,100%)"></div>
+    <button class="btn" id="playBtn">Play 72 h</button>
+  </div>
+  <div class="grid2" style="margin-top:8px">
+    <div class="panel">
+      <dl class="console" id="console"></dl>
+      <div class="advice" id="advice"></div>
+    </div>
+    <div class="panel">
+      <h3>HIGH-risk windows</h3>
+      <div class="alerts" id="alerts"></div>
+      <p class="note" id="countsNote"></p>
+    </div>
+  </div>
+  <div style="margin-top:32px">
+    <h3>Sudden-change alarm (CUSUM)</h3>
+    <p class="note" id="cusumNote"></p>
+    <div class="controls" style="margin-top:12px">
+      <div class="ctl"><label for="ck">Slack k <output id="ckOut"></output></label><input type="range" id="ck" min="0" max="1.5" step="0.1"></div>
+      <div class="ctl"><label for="chh">Alarm level h <output id="chOut"></output></label><input type="range" id="chh" min="1" max="8" step="0.5"></div>
+    </div>
+    <svg id="cusumChart" class="chart" height="200"></svg>
+  </div>
+</div></section>
+
+<section id="diagnostics"><div class="wrap">
+  <div class="sec-head">
+    <div class="eyebrow">Check</div>
+    <h2>Are the residuals clean?</h2>
+    <p class="muted" id="diagLede"></p>
+  </div>
+  <div class="stats" id="diagStats"></div>
+  <svg id="racf" class="chart" height="200"></svg>
+  <p class="note" id="diagVerdict"></p>
+</div></section>
+
+<footer><div class="wrap">
+  <div class="eyebrow">About this run</div>
+  <h2 style="margin-top:10px">What is real and what is simulated</h2>
+  <div class="grid2" style="margin-top:20px">
+    <div class="panel"><p id="honesty"></p></div>
+    <div class="panel"><p>EchoGuard also runs on real buoy data: <span class="mono">fetch_whoi.py</span> downloads 15-minute right whale call tallies from a live WHOI Robots4Whales buoy plus NOAA sea-surface temperature, and <span class="mono">run_all.py --hourly-csv</span> forecasts them with the same pipeline. Rebuild this page after any run with <span class="mono">python site/build_site.py</span>.</p></div>
+  </div>
+  <div class="team">
+    <div><b>P Venkata Bhargav Reddy</b><br><span class="mono muted">1RUA24CSE0304</span></div>
+    <div><b>Gireesh Patil</b><br><span class="mono muted">1RUA24CSE0145</span></div>
+    <div><b>M Vishwanth</b><br><span class="mono muted">1RUA24CSE0233</span></div>
+    <div><b>A Naga Sai Karthik</b><br><span class="mono muted">1RUA24CSE0050</span></div>
+  </div>
+  <p class="note">Time Series Analysis and Forecasting (CS3216) · School of Computer Science and Engineering, RV University · Guide: Prof. Prashant Adhikari</p>
+</div></footer>
+</main>
+<div class="tip" id="tip"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js" integrity="sha384-su5kReKyYlIFrI62mbQRKXHzFobMa7BHp1cK6julLPbnYcCW9NIZKJiTODjLPeDh" crossorigin="anonymous"></script>
+<script>
+const D = {"meta":{"source":"real data (data/buoy_hourly.csv), detector recall 0.896, precision 0.857","simulated":false,"detector_source":"Kaggle Whale Detection Challenge","issued":"2019-06-08 18:00","model":"SARIMAX (SST)","inside":70,"thresholds":{"backtest":[10.7,9.3],"live":[10.5,9.1]},"real_thresholds":[5.0,3.5],"cusum":{"sigma":2.232,"k":0.5,"h":4.0,"alarm":10},"recall":0.896,"precision":0.857,"source_name":"NOAA DCLDE 2027 Cape Cod Bay right whale detections","source_note":"Real right whale up-calls recorded in Cape Cod Bay, Massachusetts, 17 Feb - 12 Jun 2019, from one of five seafloor recorders (Garcia & Tolkova et al. 2025, NOAA NCEI passive acoustic archive). Counts come from the dataset's own automated up-call detector (score >= 0.75: precision 0.857, recall 0.896); EchoGuard's MiniRocket detector is evaluated separately on Kaggle clips.","horizon":72,"folds":28,"n_cal":5,"band":[50.0,250.0]},"hourly":{"t0":"2019-02-17 18:00","calls":[6.0,3.0,5.0,10.0,135.0,200.0,166.0,132.0,92.0,49.0,38.0,45.0,40.0,43.0,39.0,43.0,32.0,52.0,5.0,6.0,3.0,3.0,3.0,13.0,7.0,2.0,9.0,168.0,169.0,207.0,134.0,71.0,139.0,6.0,9.0,27.0,3.0,15.0,16.0,14.0,14.0,14.0,2.0,3.0,0.0,4.0,7.0,13.0,9.0,12.0,7.0,4.0,21.0,68.0,88.0,71.0,57.0,108.0,32.0,14.0,46.0,42.0,38.0,12.0,26.0,11.0,12.0,2.0,3.0,2.0,4.0,3.0,3.0,3.0,2.0,37.0,65.0,61.0,60.0,53.0,93.0,50.0,66.0,89.0,107.0,38.0,40.0,17.0,16.0,25.0,26.0,8.0,4.0,10.0,3.0,16.0,33.0,52.0,46.0,31.0,143.0,78.0,54.0,19.0,11.0,41.0,26.0,15.0,38.0,7.0,27.0,14.0,9.0,0.0,0.0,2.0,7.0,7.0,5.0,11.0,5.0,23.0,40.0,28.0,40.0,84.0,22.0,55.0,42.0,30.0,33.0,17.0,41.0,29.0,23.0,34.0,53.0,26.0,7.0,3.0,6.0,3.0,11.0,2.0,4.0,10.0,19.0,10.0,23.0,86.0,105.0,62.0,96.0,51.0,115.0,40.0,43.0,66.0,116.0,146.0,71.0,37.0,27.0,24.0,6.0,8.0,7.0,4.0,12.0,38.0,109.0,368.0,235.0,301.0,61.0,148.0,100.0,71.0,67.0,102.0,79.0,48.0,55.0,91.0,27.0,25.0,7.0,8.0,2.0,5.0,3.0,2.0,0.0,0.0,9.0,13.0,104.0,65.0,10.0,39.0,13.0,12.0,4.0,17.0,10.0,10.0,11.0,47.0,34.0,7.0,20.0,2.0,1.0,4.0,5.0,2.0,8.0,10.0,5.0,52.0,123.0,89.0,45.0,3.0,7.0,4.0,3.0,22.0,13.0,5.0,9.0,35.0,24.0,9.0,7.0,6.0,8.0,1.0,8.0,12.0,30.0,30.0,48.0,139.0,253.0,67.0,44.0,137.0,85.0,118.0,127.0,11.0,3.0,16.0,89.0,66.0,106.0,64.0,42.0,16.0,13.0,10.0,8.0,17.0,6.0,1.0,17.0,74.0,209.0,96.0,132.0,159.0,116.0,132.0,57.0,70.0,11.0,19.0,64.0,67.0,44.0,20.0,2.0,3.0,14.0,23.0,3.0,4.0,6.0,12.0,4.0,87.0,211.0,281.0,303.0,347.0,190.0,96.0,60.0,21.0,31.0,31.0,81.0,142.0,97.0,55.0,7.0,3.0,11.0,5.0,3.0,4.0,0.0,4.0,8.0,89.0,378.0,279.0,171.0,278.0,51.0,125.0,86.0,89.0,62.0,58.0,56.0,17.0,37.0,30.0,20.0,20.0,19.0,36.0,3.0,7.0,29.0,20.0,26.0,29.0,240.0,340.0,287.0,166.0,110.0,18.0,40.0,56.0,25.0,88.0,123.0,174.0,64.0,37.0,4.0,13.0,16.0,20.0,6.0,6.0,25.0,8.0,5.0,180.0,343.0,265.0,98.0,49.0,120.0,95.0,35.0,12.0,3.0,7.0,23.0,100.0,83.0,27.0,4.0,4.0,9.0,9.0,15.0,21.0,19.0,7.0,32.0,17.0,136.0,270.0,138.0,14.0,14.0,59.0,187.0,56.0,40.0,26.0,9.0,20.0,29.0,18.0,10.0,14.0,5.0,6.0,8.0,7.0,4.0,2.0,6.0,1.0,112.0,208.0,76.0,89.0,54.0,29.0,71.0,57.0,16.0,13.0,4.0,1.0,3.0,15.0,21.0,25.0,6.0,8.0,11.0,4.0,8.0,14.0,13.0,16.0,98.0,182.0,82.0,167.0,125.0,88.0,32.0,33.0,53.0,5.0,20.0,27.0,6.0,30.0,46.0,50.0,17.0,37.0,41.0,57.0,15.0,7.0,14.0,29.0,42.0,172.0,124.0,58.0,45.0,97.0,101.0,45.0,18.0,35.0,51.0,60.0,16.0,13.0,20.0,9.0,11.0,45.0,13.0,28.0,19.0,32.0,29.0,33.0,18.0,115.0,156.0,132.0,72.0,20.0,29.0,121.0,139.0,220.0,72.0,29.0,46.0,9.0,9.0,62.0,112.0,132.0,77.0,78.0,131.0,131.0,104.0,185.0,159.0,225.0,102.0,241.0,179.0,105.0,82.0,129.0,189.0,87.0,63.0,50.0,8.0,18.0,13.0,28.0,31.0,50.0,10.0,36.0,42.0,107.0,18.0,6.0,3.0,13.0,2.0,1.0,2.0,4.0,192.0,67.0,112.0,146.0,16.0,29.0,28.0,8.0,4.0,1.0,3.0,5.0,12.0,19.0,38.0,95.0,90.0,116.0,57.0,148.0,102.0,92.0,146.0,175.0,216.0,84.0,57.0,51.0,52.0,45.0,61.0,19.0,74.0,40.0,43.0,36.0,33.0,46.0,14.0,12.0,67.0,38.0,146.0,207.0,40.0,115.0,71.0,102.0,50.0,23.0,47.0,102.0,68.0,53.0,80.0,33.0,31.0,2.0,8.0,0.0,1.0,3.0,5.0,7.0,27.0,28.0,127.0,190.0,84.0,126.0,124.0,54.0,71.0,123.0,155.0,70.0,70.0,165.0,106.0,58.0,25.0,7.0,9.0,18.0,15.0,9.0,16.0,11.0,4.0,128.0,235.0,297.0,191.0,141.0,120.0,133.0,57.0,8.0,48.0,22.0,19.0,27.0,38.0,21.0,20.0,22.0,59.0,36.0,7.0,11.0,13.0,5.0,7.0,91.0,183.0,137.0,140.0,108.0,59.0,61.0,11.0,21.0,13.0,72.0,73.0,22.0,46.0,14.0,18.0,8.0,24.0,19.0,6.0,1.0,6.0,11.0,14.0,39.0,153.0,64.0,38.0,107.0,77.0,56.0,43.0,61.0,18.0,41.0,66.0,51.0,93.0,18.0,13.0,42.0,43.0,35.0,67.0,23.0,14.0,41.0,46.0,116.0,266.0,320.0,142.0,35.0,42.0,50.0,83.0,33.0,19.0,5.0,22.0,94.0,133.0,81.0,91.0,37.0,7.0,15.0,13.0,14.0,22.0,28.0,73.0,82.0,221.0,241.0,196.0,137.0,93.0,42.0,82.0,74.0,72.0,18.0,25.0,105.0,110.0,97.0,95.0,76.0,71.0,54.0,43.0,23.0,33.0,67.0,13.0,107.0,365.0,253.0,154.0,50.0,84.0,174.0,198.0,91.0,124.0,40.0,37.0,41.0,83.0,108.0,90.0,119.0,141.0,136.0,64.0,35.0,24.0,47.0,51.0,48.0,116.0,332.0,383.0,201.0,121.0,59.0,73.0,130.0,85.0,89.0,26.0,13.0,100.0,134.0,145.0,108.0,63.0,103.0,128.0,76.0,64.0,49.0,19.0,47.0,168.0,370.0,267.0,121.0,76.0,70.0,109.0,96.0,100.0,10.0,21.0,5.0,2.0,6.0,48.0,38.0,10.0,60.0,23.0,29.0,42.0,8.0,4.0,13.0,37.0,137.0,219.0,210.0,161.0,149.0,89.0,22.0,21.0,9.0,9.0,3.0,5.0,1.0,23.0,130.0,42.0,31.0,24.0,20.0,47.0,82.0,89.0,75.0,27.0,135.0,112.0,274.0,104.0,88.0,96.0,71.0,69.0,149.0,126.0,130.0,42.0,58.0,43.0,72.0,217.0,146.0,63.0,94.0,32.0,46.0,27.0,41.0,50.0,325.0,178.0,127.0,95.0,73.0,26.0,24.0,44.0,44.0,134.0,159.0,77.0,22.0,13.0,58.0,70.0,73.0,116.0,60.0,60.0,72.0,90.0,73.0,35.0,82.0,136.0,112.0,185.0,174.0,157.0,169.0,174.0,72.0,100.0,57.0,80.0,69.0,13.0,22.0,43.0,81.0,72.0,131.0,98.0,80.0,178.0,138.0,60.0,121.0,79.0,29.0,27.0,165.0,237.0,143.0,74.0,78.0,123.0,112.0,50.0,62.0,24.0,3.0,4.0,16.0,48.0,116.0,125.0,123.0,69.0,61.0,159.0,209.0,188.0,145.0,118.0,69.0,184.0,266.0,138.0,120.0,188.0,178.0,119.0,47.0,36.0,64.0,43.0,30.0,24.0,124.0,149.0,86.0,90.0,41.0,23.0,134.0,82.0,34.0,41.0,60.0,17.0,51.0,28.0,24.0,71.0,71.0,75.0,32.0,26.0,21.0,18.0,8.0,9.0,20.0,95.0,203.0,117.0,134.0,194.0,521.0,427.0,208.0,187.0,82.0,77.0,39.0,74.0,197.0,125.0,28.0,54.0,50.0,48.0,70.0,34.0,10.0,32.0,45.0,57.0,34.0,146.0,72.0,104.0,240.0,117.0,111.0,75.0,65.0,86.0,43.0,28.0,109.0,76.0,67.0,52.0,20.0,32.0,8.0,9.0,10.0,40.0,59.0,15.0,16.0,81.0,222.0,296.0,220.0,132.0,136.0,31.0,21.0,21.0,15.0,63.0,12.0,35.0,77.0,75.0,33.0,121.0,123.0,152.0,50.0,76.0,18.0,53.0,23.0,65.0,161.0,159.0,333.0,296.0,196.0,135.0,75.0,199.0,88.0,47.0,45.0,42.0,148.0,244.0,98.0,64.0,59.0,55.0,5.0,3.0,27.0,86.0,50.0,34.0,152.0,308.0,337.0,128.0,146.0,92.0,84.0,77.0,35.0,7.0,3.0,6.0,102.0,131.0,38.0,32.0,47.0,66.0,82.0,42.0,41.0,40.0,39.0,12.0,109.0,310.0,356.0,200.0,62.0,9.0,30.0,50.0,68.0,134.0,87.0,53.0,86.0,59.0,60.0,21.0,90.0,38.0,46.0,80.0,110.0,136.0,117.0,256.0,381.0,442.0,444.0,293.0,266.0,264.0,153.0,119.0,153.0,88.0,99.0,95.0,123.0,96.0,95.0,89.0,92.0,106.0,43.0,114.0,93.0,30.0,220.0,132.0,150.0,138.0,326.0,150.0,48.0,30.0,31.0,32.0,32.0,104.0,92.0,41.0,96.0,142.0,41.0,29.0,21.0,40.0,51.0,7.0,31.0,26.0,197.0,144.0,147.0,212.0,278.0,152.0,127.0,172.0,132.0,93.0,91.0,57.0,117.0,94.0,195.0,185.0,93.0,70.0,88.0,25.0,26.0,45.0,116.0,13.0,41.0,122.0,205.0,197.0,231.0,167.0,82.0,91.0,127.0,49.0,53.0,115.0,67.0,79.0,40.0,24.0,16.0,21.0,32.0,31.0,52.0,60.0,32.0,146.0,104.0,88.0,118.0,76.0,162.0,134.0,159.0,101.0,47.0,20.0,141.0,118.0,101.0,95.0,71.0,59.0,30.0,88.0,71.0,24.0,16.0,62.0,70.0,45.0,97.0,94.0,166.0,199.0,235.0,188.0,104.0,167.0,112.0,47.0,38.0,25.0,46.0,38.0,129.0,79.0,13.0,21.0,96.0,104.0,67.0,80.0,63.0,35.0,58.0,90.0,123.0,186.0,263.0,128.0,185.0,108.0,127.0,48.0,99.0,133.0,229.0,106.0,93.0,43.0,15.0,56.0,156.0,208.0,103.0,60.0,92.0,108.0,66.0,110.0,236.0,239.0,362.0,206.0,144.0,113.0,99.0,85.0,131.0,114.0,105.0,48.0,26.0,25.0,34.0,55.0,62.0,70.0,113.0,87.0,79.0,109.0,78.0,89.0,196.0,259.0,171.0,68.0,258.0,147.0,46.0,26.0,112.0,172.0,108.0,129.0,22.0,95.0,98.0,21.0,26.0,32.0,19.0,12.0,14.0,13.0,10.0,1.0,118.0,129.0,29.0,40.0,68.0,53.0,30.0,9.0,15.0,102.0,47.0,80.0,42.0,29.0,21.0,31.0,45.0,18.0,8.0,11.0,1.0,0.0,36.0,27.0,6.0,32.0,69.0,37.0,27.0,10.0,3.0,16.0,17.0,3.0,3.0,4.0,2.0,3.0,8.0,5.0,6.0,14.0,10.0,15.0,5.0,4.0,1.0,1.0,15.0,23.0,17.0,7.0,49.0,77.0,26.0,44.0,70.0,16.0,11.0,7.0,14.0,23.0,1.0,17.0,5.0,6.0,5.0,6.0,8.0,23.0,26.0,31.0,17.0,15.0,120.0,68.0,57.0,30.0,4.0,4.0,33.0,11.0,4.0,23.0,8.0,6.0,34.0,45.0,43.0,65.0,10.0,76.0,131.0,26.0,79.0,58.0,94.0,85.0,166.0,133.0,90.0,68.0,49.0,39.0,28.0,12.0,9.0,25.0,7.0,27.0,29.0,43.0,31.0,21.0,16.0,19.0,32.0,8.0,22.0,189.0,173.0,102.0,89.0,45.0,68.0,14.0,27.0,13.0,19.0,7.0,47.0,15.0,5.0,10.0,41.0,56.0,58.0,23.0,23.0,27.0,18.0,69.0,41.0,9.0,13.0,7.0,129.0,42.0,19.0,16.0,23.0,4.0,52.0,29.0,5.0,25.0,37.0,67.0,45.0,50.0,38.0,50.0,38.0,1.0,4.0,8.0,33.0,6.0,19.0,7.0,75.0,88.0,106.0,42.0,65.0,47.0,45.0,42.0,33.0,9.0,1.0,21.0,61.0,26.0,23.0,30.0,10.0,11.0,10.0,6.0,16.0,10.0,30.0,6.0,48.0,120.0,109.0,51.0,9.0,16.0,54.0,16.0,16.0,45.0,42.0,30.0,46.0,53.0,65.0,31.0,58.0,39.0,18.0,18.0,24.0,4.0,5.0,30.0,77.0,93.0,47.0,50.0,62.0,55.0,51.0,43.0,33.0,13.0,5.0,12.0,3.0,10.0,18.0,7.0,18.0,18.0,3.0,1.0,1.0,12.0,7.0,13.0,21.0,19.0,51.0,69.0,56.0,23.0,56.0,37.0,21.0,38.0,20.0,12.0,46.0,94.0,42.0,15.0,11.0,53.0,34.0,16.0,32.0,32.0,1.0,85.0,104.0,69.0,14.0,1.0,2.0,2.0,0.0,4.0,15.0,2.0,18.0,43.0,20.0,15.0,6.0,2.0,2.0,9.0,5.0,11.0,9.0,3.0,11.0,44.0,111.0,73.0,76.0,90.0,35.0,23.0,17.0,21.0,18.0,7.0,28.0,10.0,15.0,10.0,9.0,35.0,57.0,54.0,141.0,73.0,95.0,22.0,41.0,63.0,122.0,142.0,64.0,51.0,40.0,20.0,60.0,66.0,13.0,12.0,3.0,7.0,10.0,10.0,17.0,12.0,6.0,2.0,5.0,10.0,2.0,10.0,36.0,10.0,7.0,42.0,59.0,30.0,34.0,31.0,58.0,61.0,13.0,12.0,3.0,0.0,1.0,9.0,22.0,24.0,18.0,4.0,0.0,4.0,6.0,19.0,32.0,28.0,30.0,20.0,70.0,77.0,23.0,54.0,21.0,20.0,20.0,23.0,9.0,15.0,2.0,4.0,5.0,8.0,20.0,1.0,0.0,2.0,4.0,17.0,5.0,16.0,27.0,81.0,60.0,13.0,15.0,6.0,29.0,76.0,37.0,29.0,20.0,7.0,1.0,0.0,0.0,5.0,3.0,2.0,3.0,1.0,19.0,23.0,34.0,60.0,32.0,15.0,21.0,14.0,6.0,8.0,16.0,3.0,6.0,12.0,6.0,0.0,0.0,9.0,10.0,1.0,8.0,2.0,0.0,1.0,3.0,12.0,8.0,3.0,0.0,0.0,0.0,1.0,3.0,1.0,2.0,6.0,16.0,1.0,7.0,7.0,4.0,1.0,0.0,3.0,7.0,6.0,1.0,8.0,9.0,0.0,1.0,12.0,22.0,9.0,2.0,0.0,1.0,1.0,0.0,2.0,1.0,0.0,4.0,0.0,2.0,2.0,2.0,4.0,5.0,2.0,2.0,0.0,1.0,0.0,2.0,0.0,5.0,33.0,26.0,28.0,11.0,7.0,5.0,2.0,3.0,4.0,7.0,0.0,1.0,10.0,5.0,1.0,0.0,0.0,4.0,5.0,23.0,9.0,0.0,0.0,0.0,7.0,8.0,11.0,6.0,2.0,2.0,7.0,3.0,2.0,2.0,4.0,1.0,7.0,4.0,22.0,8.0,7.0,8.0,7.0,9.0,3.0,1.0,1.0,5.0,78.0,9.0,8.0,5.0,10.0,0.0,4.0,8.0,5.0,1.0,5.0,2.0,3.0,3.0,2.0,1.0,4.0,3.0,1.0,4.0,1.0,5.0,68.0,79.0,33.0,28.0,36.0,10.0,13.0,26.0,14.0,8.0,27.0,5.0,2.0,5.0,6.0,4.0,5.0,4.0,5.0,6.0,1.0,24.0,26.0,83.0,44.0,12.0,11.0,1.0,15.0,39.0,5.0,35.0,21.0,1.0,18.0,1.0,0.0,4.0,3.0,3.0,0.0,1.0,3.0,1.0,1.0,0.0,13.0,3.0,9.0,16.0,7.0,5.0,18.0,2.0,13.0,3.0,4.0,0.0,4.0,0.0,0.0,0.0,1.0,5.0,2.0,5.0,11.0,0.0,2.0,1.0,0.0,2.0,3.0,1.0,4.0,0.0,0.0,0.0,3.0,2.0,2.0,2.0,2.0,1.0,13.0,7.0,0.0,1.0,5.0,0.0,1.0,1.0,1.0,2.0,4.0,0.0,2.0,0.0,2.0,12.0,9.0,1.0,2.0,3.0,3.0,2.0,0.0,3.0,3.0,2.0,2.0,2.0,3.0,4.0,0.0,1.0,1.0,0.0,3.0,4.0,1.0,1.0,2.0,4.0,2.0,0.0,0.0,6.0,5.0,5.0,3.0,1.0,1.0,2.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,1.0,1.0,3.0,0.0,0.0,1.0,1.0,3.0,0.0,0.0,0.0,2.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,2.0,1.0,2.0,3.0,2.0,2.0,0.0,0.0,3.0,3.0,4.0,4.0,11.0,12.0,3.0,4.0,7.0,7.0,2.0,3.0,1.0,0.0,0.0,0.0,1.0,1.0,2.0,3.0,0.0,1.0,6.0,8.0,1.0,2.0,0.0,1.0,2.0,2.0,1.0,6.0,2.0,5.0,3.0,1.0,0.0,0.0,1.0,0.0,3.0,5.0,8.0,6.0,1.0,0.0,1.0,0.0,6.0,13.0,7.0,0.0,0.0,0.0,3.0,2.0,4.0,3.0,1.0,0.0,7.0,1.0,3.0,1.0,1.0,2.0,1.0,2.0,2.0,1.0,1.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0,2.0,0.0,0.0,1.0,1.0,2.0,0.0,4.0,0.0,0.0,1.0,0.0,0.0,1.0,0.0,0.0,4.0,1.0,0.0,0.0,1.0,4.0,1.0,0.0,3.0,3.0,3.0,3.0,0.0,1.0,5.0,3.0,0.0,7.0,0.0,3.0,0.0,1.0,0.0,0.0,0.0,2.0,1.0,1.0,0.0,1.0,1.0,4.0,3.0,0.0,0.0,1.0,0.0,1.0,2.0,14.0,4.0,4.0,1.0,0.0,2.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,4.0,0.0,0.0,0.0,2.0,0.0,0.0,2.0,0.0,0.0,1.0,1.0,0.0,0.0,1.0,2.0,2.0,0.0,0.0,1.0,1.0,1.0,1.0,6.0,3.0,1.0,1.0,2.0,7.0,1.0,0.0,2.0,0.0,0.0,0.0,1.0,2.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,2.0,1.0,0.0,1.0,2.0,2.0,4.0,5.0,3.0,25.0,2.0,0.0,5.0,4.0,3.0,0.0,0.0,1.0,8.0,4.0,1.0,0.0,0.0,2.0,5.0,3.0,0.0,2.0,1.0,6.0,4.0,1.0,1.0,1.0,1.0,2.0,0.0,1.0,2.0,1.0,1.0,0.0,5.0,4.0,2.0,1.0,4.0,11.0,0.0,3.0,3.0,2.0,1.0,1.0,1.0,2.0,13.0,0.0,0.0,2.0,1.0,6.0,3.0,1.0,1.0,2.0,0.0,0.0,0.0,1.0,4.0,0.0,1.0,6.0,15.0,1.0,12.0,1.0,1.0,0.0,4.0,0.0,4.0,2.0,0.0,0.0,7.0,1.0,5.0,3.0,0.0,3.0,2.0,8.0,1.0,0.0,0.0,1.0,2.0,1.0,0.0,2.0,3.0,1.0,1.0,1.0,3.0,1.0,5.0,1.0,2.0,1.0,0.0,3.0,0.0,2.0,5.0,1.0,0.0,1.0,1.0,1.0,3.0,1.0,1.0,3.0,2.0,4.0,3.0,4.0,4.0,8.0,1.0,0.0,1.0,1.0,0.0,4.0,0.0,2.0,2.0,4.0,2.0,0.0,1.0,10.0,1.0,6.0,1.0,3.0,2.0,4.0,0.0,0.0,0.0,3.0,4.0,0.0,0.0,1.0,2.0,0.0,7.0,1.0,2.0,2.0,1.0,3.0,1.0,5.0,4.0,0.0,0.0,0.0,1.0,1.0,0.0,3.0,0.0,0.0,0.0,0.0,2.0,4.0,0.0,1.0,1.0,1.0,1.0,0.0,1.0,0.0,3.0,1.0,1.0,3.0,2.0,1.0,0.0,0.0,2.0,2.0,2.0,0.0,0.0,1.0,2.0,2.0,2.0,0.0,2.0,2.0,1.0,1.0,4.0,12.0,3.0,1.0,1.0,1.0,4.0,0.0,0.0,1.0,9.0,1.0,6.0,2.0,0.0,5.0,5.0,0.0,2.0,1.0,0.0,0.0,0.0,0.0,2.0,3.0,1.0,1.0,6.0,2.0,0.0,1.0,1.0,1.0,2.0,1.0,0.0,2.0,1.0,2.0,2.0,1.0,0.0,1.0,3.0,2.0,1.0,1.0,2.0,3.0,3.0,4.0,1.0,3.0,1.0,5.0,3.0,2.0,3.0,1.0,3.0,3.0,5.0,3.0,1.0,2.0,0.0,2.0,0.0,1.0,1.0,1.0,2.0,1.0,1.0,4.0,2.0,2.0,1.0,3.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,2.0,0.0,1.0,1.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,1.0,1.0,2.0,3.0,7.0,4.0,7.0,5.0,1.0,7.0,9.0,3.0,0.0,1.0,4.0,0.0,1.0,0.0,3.0,0.0,4.0,1.0,1.0,2.0,0.0,0.0,1.0,0.0,2.0,7.0,1.0,0.0,0.0,0.0,2.0,2.0,6.0,1.0,4.0,5.0,0.0,2.0,5.0,3.0,5.0,2.0,0.0,1.0,1.0,0.0,2.0,1.0,5.0,2.0,0.0,0.0,4.0,4.0,3.0,0.0,3.0,2.0,1.0,1.0,1.0,7.0,0.0,0.0,0.0,0.0,1.0,1.0,2.0,2.0,3.0,4.0,3.0,3.0,0.0,1.0,1.0,2.0,1.0,1.0,2.0,0.0,0.0,3.0,1.0,4.0,1.0,7.0,1.0,2.0,3.0,2.0,2.0,1.0,1.0,1.0,1.0,1.0,1.0,0.0,1.0,0.0,4.0,1.0,2.0,1.0,2.0,0.0,2.0,0.0,3.0,0.0,2.0,1.0,4.0,3.0,1.0,1.0,2.0,1.0,2.0,3.0,5.0,4.0,0.0,0.0,1.0,1.0,0.0,1.0,3.0,0.0,2.0,4.0,2.0,1.0,1.0,0.0,1.0,0.0,2.0,1.0,4.0,2.0,2.0,1.0,1.0,0.0,0.0,1.0,0.0,1.0,2.0,7.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,5.0,2.0,0.0,1.0,2.0,3.0],"calls_true":null,"sst_daily":[2.92,2.66,2.54,2.38,2.19,2.24,2.42,2.58,2.97,3.13,2.79,2.11,2.04,2.34,2.71,2.53,2.38,2.41,2.54,2.66,2.48,2.29,2.44,2.56,2.69,2.67,2.84,3.06,3.18,3.2,3.26,3.22,3.31,3.48,3.69,3.94,3.96,3.98,4.19,4.15,4.23,4.31,4.59,4.71,4.84,4.96,5.05,5.36,5.82,6.01,5.88,5.65,5.62,5.57,5.7,6.25,6.88,6.54,6.62,6.83,6.83,6.86,7.22,7.62,7.83,7.87,8.38,8.77,8.67,8.48,8.58,8.56,8.62,8.8,8.74,8.84,8.98,9.24,9.43,9.68,9.8,9.43,9.9,10.45,10.46,10.22,9.91,10.03,10.22,10.51,10.8,10.79,11.44,11.77,11.8,11.83,11.9,12.18,12.6,12.77,13.07,13.0,13.01,13.44,13.81,14.12,14.12,14.01,14.04,14.55,14.93,15.34,15.93,16.18,16.37,16.35]},"detectors":[{"detector":"Energy threshold","pr_auc":0.264,"threshold":0.5,"precision":0.278,"recall":0.713},{"detector":"Logistic regression (MFCC)","pr_auc":0.599,"threshold":0.914,"precision":0.533,"recall":0.036},{"detector":"MiniRocket","pr_auc":0.76,"threshold":0.628,"precision":0.753,"recall":0.52}],"analysis":{"adf_p":0.018345285828018826,"kpss_p":0.01,"verdict":"stationary around a moving level (keep d=0, model the trend)","stl":{"seasonal_strength":0.5186857766788241,"trend_strength":0.5330747400486997},"acf":[1.0,0.772,0.575,0.451,0.381,0.335,0.295,0.279,0.265,0.254,0.265,0.274,0.284,0.285,0.271,0.25,0.242,0.239,0.261,0.279,0.325,0.395,0.482,0.573,0.642,0.587,0.477,0.375,0.311,0.263,0.234,0.22,0.215,0.202,0.205,0.214,0.237,0.257,0.254,0.231,0.206,0.21,0.241,0.276,0.323,0.387,0.465,0.552,0.614,0.569,0.477,0.386,0.322,0.278,0.251,0.224,0.208,0.195,0.19,0.2,0.221,0.247,0.247,0.233,0.22,0.218,0.235,0.276,0.319,0.367,0.42,0.502,0.568],"acf_ci":0.0373,"profile":[81.148,70.322,54.122,43.652,41.991,39.548,38.043,34.322,33.348,36.843,34.443,22.957,21.809,24.009,23.365,21.325,20.079,22.781,22.53,28.939,32.322,54.557,86.635,116.374],"sst_corr":-0.698},"aic":{"chosen":"SARIMA(1, 0, 0)(1, 0, 1, 24)","fit_hours":720,"n_models":36,"top5":[{"model":"SARIMA(1, 0, 0)(1, 0, 1, 24)","aic":7442.69,"bic":7465.59,"converged":true},{"model":"SARIMA(2, 0, 0)(1, 0, 1, 24)","aic":7444.41,"bic":7471.88,"converged":true},{"model":"SARIMA(1, 0, 1)(1, 0, 1, 24)","aic":7444.44,"bic":7471.91,"converged":true},{"model":"SARIMA(2, 0, 1)(1, 0, 1, 24)","aic":7444.99,"bic":7477.04,"converged":true},{"model":"SARIMA(1, 0, 2)(1, 0, 1, 24)","aic":7445.45,"bic":7477.51,"converged":true}]},"models":[{"model":"SARIMAX (SST)","mae":24.55,"rmse":31.793,"mase":0.605,"coverage80":0.828},{"model":"Seasonal naive","mae":28.387,"rmse":38.824,"mase":0.699,"coverage80":0.87},{"model":"SARIMA","mae":28.408,"rmse":35.427,"mase":0.7,"coverage80":0.841},{"model":"Naive","mae":33.136,"rmse":42.903,"mase":0.816,"coverage80":0.785},{"model":"Holt-Winters","mae":41.457,"rmse":53.484,"mase":1.021,"coverage80":0.812}],"per_fold":[{"fold":1,"model":"Naive","mae":88.028,"rmse":116.343,"coverage80":0.764},{"fold":1,"model":"Seasonal naive","mae":51.403,"rmse":68.54,"coverage80":0.764},{"fold":1,"model":"Holt-Winters","mae":56.438,"rmse":74.85,"coverage80":0.528},{"fold":1,"model":"SARIMA","mae":51.876,"rmse":72.603,"coverage80":0.736},{"fold":1,"model":"SARIMAX (SST)","mae":55.759,"rmse":76.833,"coverage80":0.708},{"fold":2,"model":"Naive","mae":54.528,"rmse":72.603,"coverage80":0.583},{"fold":2,"model":"Seasonal naive","mae":63.847,"rmse":81.626,"coverage80":0.653},{"fold":2,"model":"Holt-Winters","mae":69.694,"rmse":80.696,"coverage80":0.542},{"fold":2,"model":"SARIMA","mae":46.139,"rmse":60.428,"coverage80":0.667},{"fold":2,"model":"SARIMAX (SST)","mae":45.997,"rmse":60.396,"coverage80":0.653},{"fold":3,"model":"Naive","mae":47.889,"rmse":59.383,"coverage80":0.764},{"fold":3,"model":"Seasonal naive","mae":56.542,"rmse":77.471,"coverage80":0.806},{"fold":3,"model":"Holt-Winters","mae":62.421,"rmse":76.11,"coverage80":0.75},{"fold":3,"model":"SARIMA","mae":45.631,"rmse":57.995,"coverage80":0.75},{"fold":3,"model":"SARIMAX (SST)","mae":45.674,"rmse":58.172,"coverage80":0.75},{"fold":4,"model":"Naive","mae":68.875,"rmse":90.545,"coverage80":0.528},{"fold":4,"model":"Seasonal naive","mae":67.5,"rmse":97.726,"coverage80":0.681},{"fold":4,"model":"Holt-Winters","mae":64.855,"rmse":80.967,"coverage80":0.778},{"fold":4,"model":"SARIMA","mae":55.432,"rmse":83.641,"coverage80":0.75},{"fold":4,"model":"SARIMAX (SST)","mae":55.562,"rmse":83.218,"coverage80":0.736},{"fold":5,"model":"Naive","mae":57.764,"rmse":86.506,"coverage80":0.861},{"fold":5,"model":"Seasonal naive","mae":75.0,"rmse":105.686,"coverage80":0.722},{"fold":5,"model":"Holt-Winters","mae":40.908,"rmse":56.406,"coverage80":0.833},{"fold":5,"model":"SARIMA","mae":45.325,"rmse":61.103,"coverage80":0.764},{"fold":5,"model":"SARIMAX (SST)","mae":46.907,"rmse":60.24,"coverage80":0.667},{"fold":6,"model":"Naive","mae":93.0,"rmse":136.628,"coverage80":0.778},{"fold":6,"model":"Seasonal naive","mae":67.639,"rmse":87.771,"coverage80":0.764},{"fold":6,"model":"Holt-Winters","mae":68.149,"rmse":96.172,"coverage80":0.708},{"fold":6,"model":"SARIMA","mae":57.816,"rmse":86.628,"coverage80":0.764},{"fold":6,"model":"SARIMAX (SST)","mae":55.664,"rmse":82.376,"coverage80":0.736},{"fold":7,"model":"Naive","mae":56.292,"rmse":69.355,"coverage80":0.861},{"fold":7,"model":"Seasonal naive","mae":91.806,"rmse":114.942,"coverage80":0.667},{"fold":7,"model":"Holt-Winters","mae":54.247,"rmse":63.375,"coverage80":0.889},{"fold":7,"model":"SARIMA","mae":38.315,"rmse":47.607,"coverage80":0.861},{"fold":7,"model":"SARIMAX (SST)","mae":44.521,"rmse":53.055,"coverage80":0.722},{"fold":8,"model":"Naive","mae":69.139,"rmse":87.336,"coverage80":0.819},{"fold":8,"model":"Seasonal naive","mae":42.903,"rmse":57.629,"coverage80":0.903},{"fold":8,"model":"Holt-Winters","mae":39.912,"rmse":50.428,"coverage80":0.931},{"fold":8,"model":"SARIMA","mae":35.256,"rmse":46.824,"coverage80":0.917},{"fold":8,"model":"SARIMAX (SST)","mae":35.282,"rmse":46.492,"coverage80":0.903},{"fold":9,"model":"Naive","mae":56.444,"rmse":72.217,"coverage80":0.667},{"fold":9,"model":"Seasonal naive","mae":63.083,"rmse":79.176,"coverage80":0.889},{"fold":9,"model":"Holt-Winters","mae":59.183,"rmse":72.866,"coverage80":0.625},{"fold":9,"model":"SARIMA","mae":47.216,"rmse":58.199,"coverage80":0.681},{"fold":9,"model":"SARIMAX (SST)","mae":49.324,"rmse":61.35,"coverage80":0.722},{"fold":10,"model":"Naive","mae":22.569,"rmse":34.683,"coverage80":1.0},{"fold":10,"model":"Seasonal naive","mae":35.375,"rmse":48.773,"coverage80":0.972},{"fold":10,"model":"Holt-Winters","mae":33.384,"rmse":47.451,"coverage80":0.903},{"fold":10,"model":"SARIMA","mae":65.002,"rmse":74.082,"coverage80":0.472},{"fold":10,"model":"SARIMAX (SST)","mae":73.529,"rmse":82.272,"coverage80":0.528},{"fold":11,"model":"Naive","mae":91.778,"rmse":96.617,"coverage80":0.167},{"fold":11,"model":"Seasonal naive","mae":30.667,"rmse":46.439,"coverage80":0.931},{"fold":11,"model":"Holt-Winters","mae":101.28,"rmse":107.672,"coverage80":0.361},{"fold":11,"model":"SARIMA","mae":29.688,"rmse":38.281,"coverage80":0.944},{"fold":11,"model":"SARIMAX (SST)","mae":28.565,"rmse":37.287,"coverage80":0.944},{"fold":12,"model":"Naive","mae":30.181,"rmse":40.619,"coverage80":0.958},{"fold":12,"model":"Seasonal naive","mae":27.111,"rmse":34.669,"coverage80":0.958},{"fold":12,"model":"Holt-Winters","mae":25.303,"rmse":37.901,"coverage80":0.903},{"fold":12,"model":"SARIMA","mae":26.403,"rmse":31.867,"coverage80":0.958},{"fold":12,"model":"SARIMAX (SST)","mae":24.036,"rmse":28.976,"coverage80":0.958},{"fold":13,"model":"Naive","mae":27.431,"rmse":40.409,"coverage80":0.931},{"fold":13,"model":"Seasonal naive","mae":23.806,"rmse":32.753,"coverage80":0.972},{"fold":13,"model":"Holt-Winters","mae":29.309,"rmse":41.617,"coverage80":0.917},{"fold":13,"model":"SARIMA","mae":26.183,"rmse":31.759,"coverage80":0.958},{"fold":13,"model":"SARIMAX (SST)","mae":22.369,"rmse":28.642,"coverage80":0.875},{"fold":14,"model":"Naive","mae":113.764,"rmse":117.278,"coverage80":0.25},{"fold":14,"model":"Seasonal naive","mae":28.236,"rmse":42.791,"coverage80":0.875},{"fold":14,"model":"Holt-Winters","mae":117.014,"rmse":122.196,"coverage80":0.444},{"fold":14,"model":"SARIMA","mae":25.743,"rmse":29.676,"coverage80":0.903},{"fold":14,"model":"SARIMAX (SST)","mae":21.305,"rmse":25.642,"coverage80":0.889},{"fold":15,"model":"Naive","mae":11.903,"rmse":20.529,"coverage80":0.944},{"fold":15,"model":"Seasonal naive","mae":15.917,"rmse":24.781,"coverage80":0.903},{"fold":15,"model":"Holt-Winters","mae":24.623,"rmse":40.599,"coverage80":0.958},{"fold":15,"model":"SARIMA","mae":27.561,"rmse":30.451,"coverage80":0.972},{"fold":15,"model":"SARIMAX (SST)","mae":21.262,"rmse":24.215,"coverage80":0.958},{"fold":16,"model":"Naive","mae":4.861,"rmse":8.287,"coverage80":1.0},{"fold":16,"model":"Seasonal naive","mae":6.208,"rmse":9.087,"coverage80":1.0},{"fold":16,"model":"Holt-Winters","mae":29.541,"rmse":44.652,"coverage80":0.958},{"fold":16,"model":"SARIMA","mae":23.941,"rmse":25.472,"coverage80":1.0},{"fold":16,"model":"SARIMAX (SST)","mae":15.634,"rmse":17.451,"coverage80":1.0},{"fold":17,"model":"Naive","mae":10.944,"rmse":19.328,"coverage80":0.944},{"fold":17,"model":"Seasonal naive","mae":12.0,"rmse":21.524,"coverage80":0.903},{"fold":17,"model":"Holt-Winters","mae":25.387,"rmse":38.5,"coverage80":0.958},{"fold":17,"model":"SARIMA","mae":17.491,"rmse":20.013,"coverage80":0.903},{"fold":17,"model":"SARIMAX (SST)","mae":10.807,"rmse":17.124,"coverage80":0.861},{"fold":18,"model":"Naive","mae":2.75,"rmse":4.631,"coverage80":1.0},{"fold":18,"model":"Seasonal naive","mae":13.611,"rmse":22.959,"coverage80":0.833},{"fold":18,"model":"Holt-Winters","mae":27.347,"rmse":42.621,"coverage80":0.944},{"fold":18,"model":"SARIMA","mae":19.942,"rmse":21.226,"coverage80":1.0},{"fold":18,"model":"SARIMAX (SST)","mae":11.201,"rmse":12.833,"coverage80":1.0},{"fold":19,"model":"Naive","mae":1.569,"rmse":2.536,"coverage80":1.0},{"fold":19,"model":"Seasonal naive","mae":2.472,"rmse":3.582,"coverage80":1.0},{"fold":19,"model":"Holt-Winters","mae":27.673,"rmse":42.563,"coverage80":0.875},{"fold":19,"model":"SARIMA","mae":16.95,"rmse":17.553,"coverage80":1.0},{"fold":19,"model":"SARIMAX (SST)","mae":4.208,"rmse":5.335,"coverage80":0.972},{"fold":20,"model":"Naive","mae":1.792,"rmse":2.486,"coverage80":1.0},{"fold":20,"model":"Seasonal naive","mae":2.889,"rmse":4.311,"coverage80":0.986},{"fold":20,"model":"Holt-Winters","mae":29.191,"rmse":40.071,"coverage80":0.861},{"fold":20,"model":"SARIMA","mae":13.906,"rmse":14.343,"coverage80":0.972},{"fold":20,"model":"SARIMAX (SST)","mae":4.833,"rmse":5.322,"coverage80":0.972},{"fold":21,"model":"Naive","mae":1.347,"rmse":2.208,"coverage80":0.986},{"fold":21,"model":"Seasonal naive","mae":1.639,"rmse":2.544,"coverage80":0.986},{"fold":21,"model":"Holt-Winters","mae":26.038,"rmse":36.745,"coverage80":0.833},{"fold":21,"model":"SARIMA","mae":12.746,"rmse":13.107,"coverage80":0.917},{"fold":21,"model":"SARIMAX (SST)","mae":1.656,"rmse":2.521,"coverage80":0.667},{"fold":22,"model":"Naive","mae":1.972,"rmse":3.83,"coverage80":0.958},{"fold":22,"model":"Seasonal naive","mae":2.417,"rmse":4.525,"coverage80":0.931},{"fold":22,"model":"Holt-Winters","mae":24.463,"rmse":34.179,"coverage80":0.861},{"fold":22,"model":"SARIMA","mae":11.233,"rmse":11.47,"coverage80":0.847},{"fold":22,"model":"SARIMAX (SST)","mae":1.972,"rmse":3.83,"coverage80":0.778},{"fold":23,"model":"Naive","mae":1.847,"rmse":3.385,"coverage80":0.889},{"fold":23,"model":"Seasonal naive","mae":2.847,"rmse":4.077,"coverage80":0.875},{"fold":23,"model":"Holt-Winters","mae":22.457,"rmse":31.395,"coverage80":0.875},{"fold":23,"model":"SARIMA","mae":9.924,"rmse":10.475,"coverage80":0.653},{"fold":23,"model":"SARIMAX (SST)","mae":2.402,"rmse":3.9,"coverage80":0.708},{"fold":24,"model":"Naive","mae":1.5,"rmse":2.279,"coverage80":0.944},{"fold":24,"model":"Seasonal naive","mae":2.056,"rmse":2.977,"coverage80":0.806},{"fold":24,"model":"Holt-Winters","mae":21.857,"rmse":29.966,"coverage80":0.861},{"fold":24,"model":"SARIMA","mae":9.799,"rmse":10.198,"coverage80":0.792},{"fold":24,"model":"SARIMAX (SST)","mae":2.028,"rmse":2.872,"coverage80":0.792},{"fold":25,"model":"Naive","mae":2.111,"rmse":2.478,"coverage80":0.361},{"fold":25,"model":"Seasonal naive","mae":2.153,"rmse":2.946,"coverage80":0.889},{"fold":25,"model":"Holt-Winters","mae":21.252,"rmse":28.905,"coverage80":0.889},{"fold":25,"model":"SARIMA","mae":9.73,"rmse":10.006,"coverage80":0.875},{"fold":25,"model":"SARIMAX (SST)","mae":1.678,"rmse":2.672,"coverage80":0.917},{"fold":26,"model":"Naive","mae":1.222,"rmse":1.878,"coverage80":0.917},{"fold":26,"model":"Seasonal naive","mae":1.889,"rmse":2.609,"coverage80":0.889},{"fold":26,"model":"Holt-Winters","mae":19.795,"rmse":26.917,"coverage80":0.889},{"fold":26,"model":"SARIMA","mae":8.942,"rmse":9.215,"coverage80":0.792},{"fold":26,"model":"SARIMAX (SST)","mae":1.833,"rmse":2.489,"coverage80":0.917},{"fold":27,"model":"Naive","mae":5.139,"rmse":5.457,"coverage80":0.111},{"fold":27,"model":"Seasonal naive","mae":2.264,"rmse":3.134,"coverage80":0.833},{"fold":27,"model":"Holt-Winters","mae":21.601,"rmse":27.869,"coverage80":0.889},{"fold":27,"model":"SARIMA","mae":8.685,"rmse":8.968,"coverage80":0.833},{"fold":27,"model":"SARIMAX (SST)","mae":1.846,"rmse":2.608,"coverage80":0.889},{"fold":28,"model":"Naive","mae":1.167,"rmse":1.453,"coverage80":0.986},{"fold":28,"model":"Seasonal naive","mae":1.569,"rmse":2.038,"coverage80":0.958},{"fold":28,"model":"Holt-Winters","mae":17.486,"rmse":23.851,"coverage80":0.958},{"fold":28,"model":"SARIMA","mae":8.546,"rmse":8.763,"coverage80":0.861},{"fold":28,"model":"SARIMAX (SST)","mae":1.556,"rmse":2.082,"coverage80":0.972}],"backtest":{"t":["2019-06-08 18:00","2019-06-08 19:00","2019-06-08 20:00","2019-06-08 21:00","2019-06-08 22:00","2019-06-08 23:00","2019-06-09 00:00","2019-06-09 01:00","2019-06-09 02:00","2019-06-09 03:00","2019-06-09 04:00","2019-06-09 05:00","2019-06-09 06:00","2019-06-09 07:00","2019-06-09 08:00","2019-06-09 09:00","2019-06-09 10:00","2019-06-09 11:00","2019-06-09 12:00","2019-06-09 13:00","2019-06-09 14:00","2019-06-09 15:00","2019-06-09 16:00","2019-06-09 17:00","2019-06-09 18:00","2019-06-09 19:00","2019-06-09 20:00","2019-06-09 21:00","2019-06-09 22:00","2019-06-09 23:00","2019-06-10 00:00","2019-06-10 01:00","2019-06-10 02:00","2019-06-10 03:00","2019-06-10 04:00","2019-06-10 05:00","2019-06-10 06:00","2019-06-10 07:00","2019-06-10 08:00","2019-06-10 09:00","2019-06-10 10:00","2019-06-10 11:00","2019-06-10 12:00","2019-06-10 13:00","2019-06-10 14:00","2019-06-10 15:00","2019-06-10 16:00","2019-06-10 17:00","2019-06-10 18:00","2019-06-10 19:00","2019-06-10 20:00","2019-06-10 21:00","2019-06-10 22:00","2019-06-10 23:00","2019-06-11 00:00","2019-06-11 01:00","2019-06-11 02:00","2019-06-11 03:00","2019-06-11 04:00","2019-06-11 05:00","2019-06-11 06:00","2019-06-11 07:00","2019-06-11 08:00","2019-06-11 09:00","2019-06-11 10:00","2019-06-11 11:00","2019-06-11 12:00","2019-06-11 13:00","2019-06-11 14:00","2019-06-11 15:00","2019-06-11 16:00","2019-06-11 17:00"],"actual":[1.0,1.0,2.0,0.0,0.0,3.0,1.0,4.0,1.0,7.0,1.0,2.0,3.0,2.0,2.0,1.0,1.0,1.0,1.0,1.0,1.0,0.0,1.0,0.0,4.0,1.0,2.0,1.0,2.0,0.0,2.0,0.0,3.0,0.0,2.0,1.0,4.0,3.0,1.0,1.0,2.0,1.0,2.0,3.0,5.0,4.0,0.0,0.0,1.0,1.0,0.0,1.0,3.0,0.0,2.0,4.0,2.0,1.0,1.0,0.0,1.0,0.0,2.0,1.0,4.0,2.0,2.0,1.0,1.0,0.0,0.0,1.0],"forecast":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"lo":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"hi":[4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85,4.85],"origin":2664},"live":{"t":["2019-06-12 15:00","2019-06-12 16:00","2019-06-12 17:00","2019-06-12 18:00","2019-06-12 19:00","2019-06-12 20:00","2019-06-12 21:00","2019-06-12 22:00","2019-06-12 23:00","2019-06-13 00:00","2019-06-13 01:00","2019-06-13 02:00","2019-06-13 03:00","2019-06-13 04:00","2019-06-13 05:00","2019-06-13 06:00","2019-06-13 07:00","2019-06-13 08:00","2019-06-13 09:00","2019-06-13 10:00","2019-06-13 11:00","2019-06-13 12:00","2019-06-13 13:00","2019-06-13 14:00","2019-06-13 15:00","2019-06-13 16:00","2019-06-13 17:00","2019-06-13 18:00","2019-06-13 19:00","2019-06-13 20:00","2019-06-13 21:00","2019-06-13 22:00","2019-06-13 23:00","2019-06-14 00:00","2019-06-14 01:00","2019-06-14 02:00","2019-06-14 03:00","2019-06-14 04:00","2019-06-14 05:00","2019-06-14 06:00","2019-06-14 07:00","2019-06-14 08:00","2019-06-14 09:00","2019-06-14 10:00","2019-06-14 11:00","2019-06-14 12:00","2019-06-14 13:00","2019-06-14 14:00","2019-06-14 15:00","2019-06-14 16:00","2019-06-14 17:00","2019-06-14 18:00","2019-06-14 19:00","2019-06-14 20:00","2019-06-14 21:00","2019-06-14 22:00","2019-06-14 23:00","2019-06-15 00:00","2019-06-15 01:00","2019-06-15 02:00","2019-06-15 03:00","2019-06-15 04:00","2019-06-15 05:00","2019-06-15 06:00","2019-06-15 07:00","2019-06-15 08:00","2019-06-15 09:00","2019-06-15 10:00","2019-06-15 11:00","2019-06-15 12:00","2019-06-15 13:00","2019-06-15 14:00"],"actual":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"forecast":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"lo":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"hi":[4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0],"origin":2757},"resid":{"n":2639,"mean":0.5198228776696111,"std":35.37993056349354,"ljung_box_p_24":2.1686880441011586e-11,"ljung_box_p_48":6.5267519495291504e-21,"jarque_bera_p":0.0,"skew":1.7302715095027164,"excess_kurtosis":9.099784826381843,"acf":[1.0,0.029,-0.063,-0.028,0.019,0.051,-0.006,0.057,0.035,-0.014,0.028,0.037,0.086,0.071,0.042,0.002,0.017,-0.022,0.039,-0.037,-0.021,0.021,0.039,0.027,0.041,0.11,0.031,-0.039,-0.007,-0.023,-0.021,0.003,0.029,-0.027,-0.02,-0.027,0.052,0.071,0.059,0.021,-0.059,-0.041,0.008,-0.002,-0.004,0.022,0.027,0.039,0.018],"acf_ci":0.03815367502314663,"white_noise":false,"normal":false,"verdict":"Residuals still autocorrelated (Ljung-Box p < 0.05; ACF outside the 95% band at lags 2, 5, 7, 12, 13, 14, 18, 22...), so some structure is not captured. Residuals are not normal (Jarque-Bera p < 0.05, skew 1.73, excess kurtosis 9.10): counts are skewed, so a Gaussian interval would under-cover; EchoGuard therefore uses empirical intervals built from past forecast errors."},"aic_all":[{"p":1,"q":0,"P":1,"Q":1,"aic":7442.7,"bic":7465.6,"converged":true},{"p":2,"q":0,"P":1,"Q":1,"aic":7444.4,"bic":7471.9,"converged":true},{"p":1,"q":1,"P":1,"Q":1,"aic":7444.4,"bic":7471.9,"converged":true},{"p":2,"q":1,"P":1,"Q":1,"aic":7445.0,"bic":7477.0,"converged":true},{"p":1,"q":2,"P":1,"Q":1,"aic":7445.5,"bic":7477.5,"converged":true},{"p":2,"q":2,"P":1,"Q":1,"aic":7446.8,"bic":7483.4,"converged":true},{"p":0,"q":2,"P":1,"Q":1,"aic":7457.0,"bic":7484.5,"converged":true},{"p":1,"q":0,"P":1,"Q":0,"aic":7501.0,"bic":7519.3,"converged":true},{"p":2,"q":0,"P":1,"Q":0,"aic":7502.5,"bic":7525.4,"converged":true},{"p":1,"q":1,"P":1,"Q":0,"aic":7502.6,"bic":7525.4,"converged":true},{"p":1,"q":2,"P":1,"Q":0,"aic":7504.0,"bic":7531.4,"converged":true},{"p":2,"q":1,"P":1,"Q":0,"aic":7504.9,"bic":7532.3,"converged":true},{"p":2,"q":2,"P":1,"Q":0,"aic":7505.9,"bic":7537.9,"converged":true},{"p":0,"q":1,"P":1,"Q":1,"aic":7512.2,"bic":7535.1,"converged":true},{"p":0,"q":2,"P":1,"Q":0,"aic":7520.2,"bic":7543.1,"converged":true},{"p":1,"q":0,"P":0,"Q":1,"aic":7529.4,"bic":7547.8,"converged":true},{"p":2,"q":0,"P":0,"Q":1,"aic":7529.9,"bic":7552.8,"converged":true},{"p":2,"q":1,"P":0,"Q":1,"aic":7529.9,"bic":7557.4,"converged":true},{"p":1,"q":1,"P":0,"Q":1,"aic":7530.1,"bic":7553.0,"converged":true},{"p":1,"q":2,"P":0,"Q":1,"aic":7530.8,"bic":7558.3,"converged":true},{"p":2,"q":2,"P":0,"Q":1,"aic":7532.9,"bic":7565.0,"converged":true},{"p":0,"q":2,"P":0,"Q":1,"aic":7553.4,"bic":7576.3,"converged":true},{"p":2,"q":1,"P":0,"Q":0,"aic":7583.8,"bic":7606.7,"converged":true},{"p":0,"q":1,"P":1,"Q":0,"aic":7584.9,"bic":7603.2,"converged":true},{"p":2,"q":2,"P":0,"Q":0,"aic":7585.7,"bic":7613.1,"converged":true},{"p":2,"q":0,"P":0,"Q":0,"aic":7587.0,"bic":7605.3,"converged":true},{"p":1,"q":1,"P":0,"Q":0,"aic":7587.7,"bic":7606.0,"converged":true},{"p":1,"q":2,"P":0,"Q":0,"aic":7587.8,"bic":7610.7,"converged":true},{"p":1,"q":0,"P":0,"Q":0,"aic":7590.2,"bic":7604.0,"converged":true},{"p":0,"q":2,"P":0,"Q":0,"aic":7622.2,"bic":7640.5,"converged":true},{"p":0,"q":1,"P":0,"Q":1,"aic":7629.2,"bic":7647.5,"converged":true},{"p":0,"q":1,"P":0,"Q":0,"aic":7709.6,"bic":7723.3,"converged":true},{"p":0,"q":0,"P":1,"Q":1,"aic":7727.4,"bic":7745.7,"converged":true},{"p":0,"q":0,"P":1,"Q":0,"aic":7811.0,"bic":7824.7,"converged":true},{"p":0,"q":0,"P":0,"Q":1,"aic":7894.7,"bic":7908.4,"converged":true},{"p":0,"q":0,"P":0,"Q":0,"aic":8034.9,"bic":8044.0,"converged":true}]};
+const $ = s => document.querySelector(s);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const DUR = reduce ? 0 : 650;
+const T0 = new Date(D.hourly.t0.replace(" ", "T") + ":00Z");
+const at = i => new Date(T0.getTime() + i * 3600e3);
+const fmtT = d => d.toUTCString().slice(0, 22) + " UTC";
+const fmtS = d => d.toUTCString().slice(5, 11) + " " + d.toUTCString().slice(17, 22);
+const f = (v, n = 2) => v == null ? "–" : (+v).toFixed(n);
+const pf = p => p < 0.001 ? "< 0.001" : (+p).toFixed(3);
+const LEVEL_C = { LOW: "--low", MEDIUM: "--med", HIGH: "--high" };
+const ADVICE = { LOW: "Normal operations. Keep monitoring the buoy feed.",
+  MEDIUM: "Post lookouts and be ready to slow to 10 knots or less.",
+  HIGH: "Slow to 10 knots or less or reroute around the area." };
+const tip = $("#tip");
+function showTip(e, html) { tip.innerHTML = html; tip.style.opacity = 1;
+  const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8), y = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8);
+  tip.style.left = x + "px"; tip.style.top = y + "px"; }
+const hideTip = () => tip.style.opacity = 0;
+function seg(el, cb) { el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+  el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); cb(b.dataset.k); }); }
+const W = el => Math.max(280, el.getBoundingClientRect().width);
+const safe = fn => () => { try { fn(); } catch (e) { console.error(e); } };   // one failing chart must not blank the page
+const renders = []; const reg = fn => { fn = safe(fn); renders.push(fn); fn(); };
+let rt; const rerender = () => { clearTimeout(rt); rt = setTimeout(() => renders.forEach(fn => fn()), 120); };
+addEventListener("resize", rerender);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rerender);
+new MutationObserver(rerender).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+const calls = D.hourly.calls, N = calls.length;
+const M = D.meta, levelOf = (u, hi, me) => u >= hi ? "HIGH" : u >= me ? "MEDIUM" : "LOW";
+function windows(levels, gap = 1) { const out = [];
+  levels.forEach((l, i) => { if (l !== "HIGH") return; const h = i + 1;
+    if (out.length && h - out[out.length - 1][1] <= gap + 1) out[out.length - 1][1] = h; else out.push([h, h]); });
+  return out; }
+const meanBefore = o => { const v = calls.slice(0, o).filter(x => x != null); return d3.mean(v); };
+const toReal = (t, o) => M.recall ? (t - (1 - M.precision) * meanBefore(o)) / M.recall : t;
+
+/* ---------------- hero: risk now + chips ---------------- */
+function heroRisk() {
+  const bt = D.backtest, [hi, me] = M.thresholds.backtest, lv = levelOf(bt.hi[0], hi, me);
+  $("#riskNow").innerHTML = `<div class="risk-badge" style="background:var(${LEVEL_C[lv]})">${lv}</div>
+    <div class="eyebrow" style="color:var(--muted)">Risk, next hour</div>
+    <div class="mono" style="font-size:.85rem">Issued ${fmtT(new Date(M.issued.replace(" ", "T") + ":00Z"))}<br>${ADVICE[lv]}</div>`;
+  const ch = [[M.simulated ? "Simulated season" : "Real buoy data", M.simulated ? "--med" : "--low"],
+    [M.simulated ? `Detector trained on ${M.detector_source.replace(" Whale Detection Challenge", "")} clips` : (M.source_name || "Real detections"), "--accent"],
+    [`${M.model} · ${M.horizon} h ahead`, "--accent"]];
+  $("#heroChips").innerHTML = ch.map(([t, c]) => `<span class="chip"><span class="dot" style="background:var(${c})"></span>${t}</span>`).join("");
+}
+heroRisk();
+
+/* ---------------- hero: live waterfall spectrogram ---------------- */
+(() => {
+  const cv = $("#waterfall"), ctx = cv.getContext("2d");
+  let off, octx, paused = false, count = 0, t = 0, callAt = 1.5, call = null, w, h;
+  const FMAX = 500, SPEED = 42; // px per second
+  const cmap = v => { v = Math.max(0, Math.min(1, v)); // instrument palette: deep navy -> teal -> amber -> pale
+    const stops = [[7,19,27],[14,60,82],[40,140,160],[240,163,71],[255,240,210]];
+    const x = v * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(x)), u = x - i;
+    return stops[i].map((c, k) => Math.round(c + (stops[i + 1][k] - c) * u)); };
+  function size() { const r = devicePixelRatio || 1; w = Math.round(cv.clientWidth * r); h = Math.round(cv.clientHeight * r);
+    cv.width = w; cv.height = h; off = document.createElement("canvas"); off.width = w; off.height = h; octx = off.getContext("2d");
+    octx.fillStyle = "#07131b"; octx.fillRect(0, 0, w, h); }
+  function column(tt) { // one spectrogram column at time tt (seconds)
+    const img = octx.createImageData(1, h);
+    let cf = null, amp = 0;
+    if (call && tt >= call.s && tt <= call.s + call.d) { const u = (tt - call.s) / call.d;
+      cf = call.f0 + (call.f1 - call.f0) * u; amp = Math.sin(Math.PI * u); }
+    for (let y = 0; y < h; y++) { const fr = FMAX * (1 - y / h);
+      let v = 0.13 + 0.22 * Math.exp(-fr / 90) + Math.random() * 0.13;                 // coloured ocean noise
+      v += 0.32 * Math.exp(-((fr - 38) ** 2) / 18) * (0.7 + 0.3 * Math.sin(tt * 0.7));   // distant ship tone ~38 Hz
+      if (cf != null) v += 0.85 * amp * Math.exp(-((fr - cf) ** 2) / 70);
+      const [r, g, b] = cmap(v); img.data.set([r, g, b, 255], y * 4); }
+    return img; }
+  function guides() { const r = devicePixelRatio || 1; ctx.save(); ctx.setLineDash([4 * r, 5 * r]); ctx.strokeStyle = "rgba(207,226,232,.35)"; ctx.lineWidth = r;
+    [50, 250].forEach(fr => { const y = h * (1 - fr / FMAX); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); });
+    ctx.setLineDash([]); ctx.fillStyle = "rgba(207,226,232,.65)"; ctx.font = `${11 * r}px IBM Plex Mono, monospace`;
+    [0, 100, 200, 300, 400].forEach(fr => ctx.fillText(fr + " Hz", w - 58 * r, h * (1 - fr / FMAX) - 4 * r)); ctx.restore(); }
+  function step(dt) { const r = devicePixelRatio || 1, px = Math.max(1, Math.round(SPEED * dt * r));
+    for (let k = 0; k < px; k++) { t += 1 / (SPEED * r);
+      if (!call && t >= callAt) call = { s: t, d: 0.8 + Math.random() * 0.5, f0: 60 + Math.random() * 40, f1: 150 + Math.random() * 70 };
+      if (call && t > call.s + call.d) { count++; $("#callCount").textContent = count; flash(); call = null; callAt = t + 2.2 + Math.random() * 3; }
+      octx.drawImage(off, -1, 0); octx.putImageData(column(t), w - 1, 0); }
+    ctx.drawImage(off, 0, 0); guides(); }
+  const fl = $("#flash"); let ft; function flash() { fl.classList.add("on"); clearTimeout(ft); ft = setTimeout(() => fl.classList.remove("on"), 1300); }
+  size(); addEventListener("resize", () => { size(); prime(); });
+  function prime() { for (let i = 0; i < w; i++) { t += 1 / SPEED; if (!call && t >= callAt) call = { s: t, d: 1, f0: 70, f1: 200 };
+      if (call && t > call.s + call.d) { call = null; callAt = t + 3; } octx.drawImage(off, -1, 0); octx.putImageData(column(t), w - 1, 0); }
+    ctx.drawImage(off, 0, 0); guides(); }
+  t = -w / SPEED; callAt = -w / SPEED * 0.35; prime();          // complete frame at rest
+  let last = performance.now();
+  function loop(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; if (!paused && !document.hidden) step(dt); requestAnimationFrame(loop); }
+  const pb = $("#pauseBtn");
+  if (reduce) { paused = true; pb.textContent = "Play"; pb.setAttribute("aria-pressed", "true"); }
+  pb.onclick = () => { paused = !paused; pb.textContent = paused ? "Play" : "Pause"; pb.setAttribute("aria-pressed", paused); };
+  requestAnimationFrame(loop);
+  let ac; $("#soundBtn").onclick = () => { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain(), n = ac.currentTime;   // pitched up 3x so laptop speakers can play it
+    o.type = "sine"; o.frequency.setValueAtTime(70 * 3, n); o.frequency.exponentialRampToValueAtTime(190 * 3, n + 1);
+    g.gain.setValueAtTime(0.0001, n); g.gain.exponentialRampToValueAtTime(0.25, n + 0.15); g.gain.exponentialRampToValueAtTime(0.0001, n + 1.1);
+    o.connect(g).connect(ac.destination); o.start(n); o.stop(n + 1.15); call = { s: t, d: 1, f0: 70, f1: 190 }; } catch (e) {} };
+  $("#soundBtn").title = "A 1-second sweep from 70 to 190 Hz, played three times higher so small speakers can reproduce it";
+})();
+
+/* ---------------- pipeline stepper ---------------- */
+(() => {
+  const det = D.detectors.find(d => d.detector === "MiniRocket") || {};
+  const best = D.models[0], n_true = D.hourly.calls_true ? d3.sum(D.hourly.calls_true) : null, n_det = d3.sum(calls.filter(x => x != null));
+  const S = [
+    ["Listen", "Hydrophone buoy", "Audio sampled at 2 kHz, cut into 2-second windows every second and band-passed to 50–250 Hz with a 4th-order Butterworth filter.",
+      [["2 kHz", "sample rate"], ["2 s / 1 s", "window / hop"], ["50–250 Hz", "up-call band"]], "#detector"],
+    ["Detect", "MiniRocket", "84 fixed convolution kernels at several dilations read each window's frequency contour; a regularised logistic regression scores it.",
+      [[f(det.pr_auc, 3), "PR-AUC on test clips"], [f(det.precision), "precision"], [f(det.recall), "recall"]], "#detector"],
+    ["Count", "Hourly series", "Detections are counted per UTC hour. Buoy outages stay missing; gaps of 3 h or less are interpolated.",
+      [[N, "hours"], [n_det, "detections"], [calls.filter(x => x == null).length, "hours offline"]], "#season"],
+    ["Analyse", "ADF · KPSS · STL", "Stationarity tests, STL decomposition with a 24-hour period and autocorrelation set the model form.",
+      [[pf(D.analysis.adf_p), "ADF p"], [f(D.analysis.stl.seasonal_strength), "seasonal strength"], [f(D.analysis.acf[24], 3), "ACF at 24 h"]], "#analysis"],
+    ["Forecast", "5 models", "Naive, seasonal naive, Holt-Winters, SARIMA and SARIMAX with sea temperature, tested on " + M.folds + " rolling 72-hour folds.",
+      [[best.model, "best by MAE"], [f(best.mae), "MAE (calls/h)"], [Math.round(best.coverage80 * 100) + "%", "80% band coverage"]], "#models"],
+    ["Warn", "Risk + CUSUM", "The upper edge of the 80% band sets LOW, MEDIUM or HIGH; HIGH hours merge into alert windows; CUSUM flags sudden rises.",
+      [[M.thresholds.backtest[0], "HIGH threshold (det/h)"], [windows(D.backtest.hi.map(u => levelOf(u, ...M.thresholds.backtest))).length, "alert windows"], ["+" + M.cusum.alarm + " h", "CUSUM alarm"]], "#forecast"]];
+  const pipe = $("#pipe"), box = $("#stageDetail");
+  pipe.innerHTML = S.map((s, i) => `<button class="stage" style="--i:${i}" aria-pressed="${i === 0}" data-i="${i}"><span class="n">0${i + 1}</span><b>${s[0]}</b><span>${s[1]}</span></button>`).join("");
+  const show = i => { const s = S[i]; pipe.querySelectorAll(".stage").forEach((b, k) => b.setAttribute("aria-pressed", k === i));
+    box.innerHTML = `<div><h3>${s[0]} · ${s[1]}</h3><p class="note" style="color:var(--ink)">${s[2]}</p><p class="note"><a href="${s[4]}">Open this station ↓</a></p></div>
+      <div class="facts">${s[3].map(([v, k]) => `<div class="fact"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("")}</div>`; };
+  pipe.addEventListener("click", e => { const b = e.target.closest(".stage"); if (b) show(+b.dataset.i); });
+  show(0);
+})();
+
+/* ---------------- detector lab: real FFT in the browser ---------------- */
+(() => {
+  const SR = 2000, NS = 4000, NF = 256, HOP = 32, FSHOW = 400;
+  let kind = "up", seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const gauss = () => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  function fft(re, im) { const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) { let b = n >> 1; for (; j & b; b >>= 1) j ^= b; j ^= b; if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; } }
+    for (let len = 2; len <= n; len <<= 1) { const a = -2 * Math.PI / len, wr = Math.cos(a), wi = Math.sin(a);
+      for (let i = 0; i < n; i += len) { let cr = 1, ci = 0;
+        for (let k = 0; k < len / 2; k++) { const ur = re[i + k], ui = im[i + k], vr = re[i + k + len / 2] * cr - im[i + k + len / 2] * ci, vi = re[i + k + len / 2] * ci + im[i + k + len / 2] * cr;
+          re[i + k] = ur + vr; im[i + k] = ui + vi; re[i + k + len / 2] = ur - vr; im[i + k + len / 2] = ui - vi; const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t; } } } }
+  function clip(snr) { const x = new Float32Array(NS); let prev = 0; seed = 7 + (clip.r || 0);
+    for (let i = 0; i < NS; i++) { prev = 0.9 * prev + gauss(); x[i] = prev; }
+    const sd = Math.sqrt(x.reduce((s, v) => s + v * v, 0) / NS); for (let i = 0; i < NS; i++) x[i] /= sd;
+    const s0 = 0.5, dur = 1.0, f0 = 75, f1 = 200;
+    for (let i = 0; i < NS; i++) { const t = i / SR;
+      if (kind === "ship") x[i] += 1.1 * Math.sin(2 * Math.PI * 42 * t);
+      else if (t >= s0 && t < s0 + dur) { const tt = t - s0, a = kind === "up" ? f0 : f1, b = kind === "up" ? f1 : f0;
+        x[i] += snr * 2.2 * Math.sin(2 * Math.PI * (a * tt + 0.5 * (b - a) / dur * tt * tt)) * Math.sin(Math.PI * tt / dur) ** 2; } }
+    return x; }
+  function spec(x) { const frames = [], win = Array.from({ length: NF }, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / NF));
+    for (let s = 0; s + NF <= NS; s += HOP) { const re = new Float64Array(NF), im = new Float64Array(NF);
+      for (let i = 0; i < NF; i++) re[i] = x[s + i] * win[i]; fft(re, im);
+      frames.push(Array.from({ length: NF / 2 }, (_, k) => Math.log(re[k] * re[k] + im[k] * im[k] + 1e-6))); }
+    return frames; }
+  const cv = $("#lab"), ctx = cv.getContext("2d");
+  function draw() {
+    const snr = +$("#snr").value; $("#snrOut").textContent = snr.toFixed(2);
+    const S = spec(clip(snr)), df = SR / NF, kmax = Math.floor(FSHOW / df), klo = Math.ceil(50 / df), khi = Math.floor(250 / df);
+    const r = devicePixelRatio || 1, w = Math.round(cv.clientWidth * r), h = Math.round(cv.clientHeight * r); cv.width = w; cv.height = h;
+    const allv = S.flatMap(c => c.slice(1, kmax)).sort(d3.ascending), lo = d3.quantile(allv, .05), hi = d3.quantile(allv, .995);   // clip outliers for contrast
+    const img = ctx.createImageData(S.length, kmax);
+    S.forEach((c, i) => { for (let k = 0; k < kmax; k++) { const v = Math.max(0, Math.min(1, (c[k] - lo) / (hi - lo))), j = ((kmax - 1 - k) * S.length + i) * 4;
+      const col = [[7,19,27],[14,60,82],[40,140,160],[240,163,71],[255,240,210]], x = Math.max(0, Math.min(.999, v ** 1.6)) * 4, a = Math.floor(x), u = x - a;
+      img.data.set(col[a].map((q, m) => Math.round(q + (col[a + 1][m] - q) * u)).concat(255), j); } });
+    const tmp = document.createElement("canvas"); tmp.width = S.length; tmp.height = kmax; tmp.getContext("2d").putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = true; ctx.drawImage(tmp, 0, 0, w, h);
+    // contour: loudest frequency inside 50-250 Hz per frame, and the trend over the loudest quarter of frames
+    const peak = S.map(c => { let b = klo; for (let k = klo; k <= khi; k++) if (c[k] > c[b]) b = k; return b * df; });
+    const pow = S.map(c => d3.sum(c.slice(klo, khi + 1).map(Math.exp))), cut = d3.quantile([...pow].sort(d3.ascending), 0.75);
+    const pts = peak.map((f, i) => [i * HOP / SR, f]).filter((_, i) => pow[i] >= cut);
+    const mx = d3.mean(pts, p => p[0]), my = d3.mean(pts, p => p[1]);
+    const slope = d3.sum(pts, p => (p[0] - mx) * (p[1] - my)) / (d3.sum(pts, p => (p[0] - mx) ** 2) || 1);
+    ctx.strokeStyle = css("--call"); ctx.lineWidth = 2 * r; ctx.beginPath();
+    peak.forEach((fq, i) => { const X = (i + .5) / S.length * w, Y = h * (1 - fq / FSHOW); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.stroke();
+    ctx.setLineDash([4 * r, 5 * r]); ctx.strokeStyle = "rgba(207,226,232,.4)"; ctx.lineWidth = r;
+    [50, 250].forEach(fq => { const Y = h * (1 - fq / FSHOW); ctx.beginPath(); ctx.moveTo(0, Y); ctx.lineTo(w, Y); ctx.stroke(); }); ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(207,226,232,.75)"; ctx.font = `${11 * r}px IBM Plex Mono, monospace`;
+    [0, 100, 200, 300].forEach(fq => ctx.fillText(fq + " Hz", 6 * r, h * (1 - fq / FSHOW) - 4 * r)); ctx.fillText("0 s", 6 * r, h - 6 * r); ctx.fillText("2 s", w - 26 * r, h - 6 * r);
+    const v = slope > 40 ? ["rising contour → up-call shape", "--low"] : slope < -40 ? ["falling contour → not an up-call", "--high"] : ["flat contour → noise", "--med"];
+    $("#labVerdict").innerHTML = `trend ${slope >= 0 ? "+" : ""}${slope.toFixed(0)} Hz/s · <span style="color:var(${v[1]})">${v[0]}</span>`;
+  }
+  seg($("#clipSeg"), k => { kind = k; draw(); }); $("#snr").oninput = draw; $("#reroll").onclick = () => { clip.r = (clip.r || 0) + 101; draw(); };
+  reg(draw);
+})();
+
+/* ---------------- detector bars ---------------- */
+(() => {
+  let key = "pr_auc"; const el = $("#detChart");
+  $("#detNote").textContent = `${D.meta.detector_source}: labelled 2-second clips recorded by Cornell hydrophone buoys. Test split only.`;
+  function draw() { const w = W(el), h = 190, m = { l: 190, r: 46, t: 6, b: 24 }, svg = d3.select(el).attr("viewBox", `0 0 ${w} ${h}`);
+    const data = D.detectors, x = d3.scaleLinear([0, 1], [m.l, w - m.r]), y = d3.scaleBand(data.map(d => d.detector), [m.t, h - m.b]).padding(.32);
+    svg.selectAll(".ax").data([0]).join("g").attr("class", "ax").attr("transform", `translate(0,${h - m.b})`).call(d3.axisBottom(x).ticks(5, ".1f"));
+    svg.selectAll(".lab").data(data).join("text").attr("class", "lab").attr("x", m.l - 10).attr("y", d => y(d.detector) + y.bandwidth() / 2 + 4).attr("text-anchor", "end")
+      .style("fill", css("--ink")).style("font", "500 12px IBM Plex Sans, sans-serif").text(d => d.detector);
+    svg.selectAll(".bar").data(data).join("rect").attr("class", "bar").attr("x", m.l).attr("y", d => y(d.detector)).attr("height", y.bandwidth()).attr("rx", 2)
+      .attr("fill", d => d.detector === "MiniRocket" ? css("--accent") : css("--rule")).transition().duration(DUR).attr("width", d => x(d[key]) - m.l);
+    svg.selectAll(".val").data(data).join("text").attr("class", "val").attr("y", d => y(d.detector) + y.bandwidth() / 2 + 4).style("fill", css("--ink"))
+      .text(d => f(d[key], 3)).transition().duration(DUR).attr("x", d => x(d[key]) + 6); }
+  seg($("#detSeg"), k => { key = k; draw(); }); reg(draw);
+})();
+
+/* ---------------- season chart with brush ---------------- */
+(() => {
+  const main = $("#seasonChart"), brushEl = $("#seasonBrush"); let dom = [0, N], showTrue = false;
+  const nT = D.hourly.calls_true ? d3.sum(D.hourly.calls_true.filter(v => v != null)) : null, nD = d3.sum(calls.filter(v => v != null));
+  const days = Math.round(N / 24), r = D.analysis.sst_corr, nGap = calls.filter(v => v == null).length;
+  $("#seasonTitle").textContent = M.simulated && days === 60 ? "Sixty days at the buoy" : `${days} days at the buoy`;
+  $("#seasonLede").textContent = (M.simulated ? `A simulated ${days}-day spring season (1 Mar – 29 Apr 2016), ` : (M.source_note ? M.source_note + " " : "Real buoy data. ")) +
+    (nT ? `seen through the detector: ${Math.round(nT)} true up-calls became ${Math.round(nD)} detections (recall ${f(M.recall)}, precision ${f(M.precision)}). ` : "") +
+    `Daily calls ${r > 0 ? "rise" : "fall"} as the sea warms (daily correlation r = ${f(r)}) and peak at night.` +
+    (nGap ? ` ${nGap} offline hours are kept as gaps, not zeros.` : "");
+  const gaps = []; calls.forEach((v, i) => { if (v == null) { if (gaps.length && gaps[gaps.length - 1][1] === i) gaps[gaps.length - 1][1] = i + 1; else gaps.push([i, i + 1]); } });
+  const sst = D.hourly.sst_daily;
+  function draw() { const w = W(main), h = 300, m = { l: 40, r: 44, t: 10, b: 26 }, svg = d3.select(main).attr("viewBox", `0 0 ${w} ${h}`);
+    const x = d3.scaleUtc([at(dom[0]), at(dom[1])], [m.l, w - m.r]), ymax = d3.max(calls.slice(dom[0], dom[1]).concat(showTrue ? D.hourly.calls_true.slice(dom[0], dom[1]) : []).filter(v => v != null)) || 1;
+    const y = d3.scaleLinear([0, ymax * 1.08], [h - m.b, m.t]).nice(), ys = d3.scaleLinear(d3.extent(sst).map((v, i) => v + (i ? .5 : -.5)), [h - m.b, m.t]);
+    svg.selectAll("*").remove();
+    svg.append("g").attr("transform", `translate(0,${h - m.b})`).call(d3.axisBottom(x).ticks(Math.max(3, w / 120)));
+    svg.append("g").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5)).call(g => g.select(".domain").remove());
+    svg.append("g").attr("transform", `translate(${w - m.r},0)`).call(d3.axisRight(ys).ticks(4).tickFormat(d => d + "°")).call(g => g.select(".domain").remove());
+    svg.append("g").selectAll("line").data(y.ticks(5)).join("line").attr("x1", m.l).attr("x2", w - m.r).attr("y1", y).attr("y2", y).attr("stroke", css("--rule")).attr("stroke-dasharray", "2 4");
+    svg.append("g").selectAll("rect").data(gaps.filter(g => g[1] > dom[0] && g[0] < dom[1])).join("rect").attr("x", g => x(at(Math.max(g[0], dom[0])))).attr("width", g => Math.max(2, x(at(Math.min(g[1], dom[1]))) - x(at(Math.max(g[0], dom[0])))))
+      .attr("y", m.t).attr("height", h - m.b - m.t).attr("fill", css("--rule")).attr("opacity", .7);
+    const idx = d3.range(dom[0], dom[1]);
+    svg.append("path").datum(idx).attr("fill", css("--accent")).attr("fill-opacity", .28).attr("stroke", css("--accent")).attr("stroke-width", 1)
+      .attr("d", d3.area().defined(i => calls[i] != null).x(i => x(at(i))).y0(y(0)).y1(i => y(calls[i])).curve(d3.curveStepAfter));
+    if (showTrue) svg.append("path").datum(idx).attr("fill", "none").attr("stroke", css("--muted")).attr("stroke-width", 1.2)
+      .attr("d", d3.line().defined(i => D.hourly.calls_true[i] != null).x(i => x(at(i))).y(i => y(D.hourly.calls_true[i])).curve(d3.curveStepAfter));
+    svg.append("path").datum(sst.map((v, d) => [d * 24 + 12, v]).filter(p => p[0] >= dom[0] - 24 && p[0] <= dom[1] + 24)).attr("fill", "none").attr("stroke", css("--call")).attr("stroke-width", 2.2)
+      .attr("d", d3.line().x(p => x(at(p[0]))).y(p => ys(p[1])).curve(d3.curveMonotoneX));
+    svg.append("text").attr("x", m.l).attr("y", m.t + 2).attr("dy", ".7em").attr("dx", 6).text("detections / h");
+    const cur = svg.append("line").attr("y1", m.t).attr("y2", h - m.b).attr("stroke", css("--ink")).attr("opacity", 0);
+    svg.append("rect").attr("x", m.l).attr("y", m.t).attr("width", w - m.l - m.r).attr("height", h - m.t - m.b).attr("fill", "transparent")
+      .on("mousemove", e => { const i = Math.max(dom[0], Math.min(dom[1] - 1, Math.round((x.invert(d3.pointer(e)[0]) - T0) / 3600e3)));
+        cur.attr("x1", x(at(i))).attr("x2", x(at(i))).attr("opacity", .5);
+        showTip(e, `${fmtT(at(i))}<br>detections ${calls[i] == null ? "buoy offline" : calls[i]}${D.hourly.calls_true ? `<br>true calls ${D.hourly.calls_true[i] ?? "–"}` : ""}<br>SST ${f(sst[Math.floor(i / 24)], 1)} °C`); })
+      .on("mouseleave", () => { cur.attr("opacity", 0); hideTip(); });
+  }
+  function drawBrush() { const w = W(brushEl), h = 64, m = { l: 40, r: 44, t: 4, b: 18 }, svg = d3.select(brushEl).attr("viewBox", `0 0 ${w} ${h}`); svg.selectAll("*").remove();
+    const x = d3.scaleLinear([0, N], [m.l, w - m.r]), daily = d3.range(N / 24).map(d => d3.sum(calls.slice(d * 24, d * 24 + 24).filter(v => v != null)));
+    const y = d3.scaleLinear([0, d3.max(daily)], [h - m.b, m.t]);
+    svg.append("g").selectAll("rect").data(daily).join("rect").attr("x", (v, d) => x(d * 24) + .5).attr("width", Math.max(1, x(24) - x(0) - 1)).attr("y", y).attr("height", v => h - m.b - y(v)).attr("fill", css("--muted")).attr("opacity", .55);
+    svg.append("g").attr("transform", `translate(0,${h - m.b})`).call(d3.axisBottom(x).tickValues(d3.range(0, N + 1, 240)).tickFormat(i => "day " + (i / 24 + 1)));
+    const br = d3.brushX().extent([[m.l, m.t], [w - m.r, h - m.b]]).on("brush end", e => { dom = e.selection ? e.selection.map(v => Math.round(x.invert(v))) : [0, N];
+      if (dom[1] - dom[0] < 24) dom = [0, N]; draw(); });
+    const g = svg.append("g").call(br); g.selectAll(".selection").attr("fill", css("--accent")).attr("fill-opacity", .18).attr("stroke", css("--accent"));
+    if (dom[0] > 0 || dom[1] < N) g.call(br.move, [x(dom[0]), x(dom[1])]); }
+  $("#trueToggle").onclick = e => { showTrue = !showTrue; e.currentTarget.setAttribute("aria-pressed", showTrue); draw(); };
+  if (!D.hourly.calls_true) $("#trueToggle").hidden = true;
+  reg(() => { draw(); drawBrush(); });
+})();
+
+/* ---------------- heat map + daily profile ---------------- */
+(() => {
+  const el = $("#heat"), days = N / 24;
+  function draw() { const w = W(el), h = 230, m = { l: 34, r: 22, t: 4, b: 22 }, svg = d3.select(el).attr("viewBox", `0 0 ${w} ${h}`); svg.selectAll("*").remove();
+    const cw = (w - m.l - m.r) / days, chh = (h - m.t - m.b) / 24, vmax = d3.quantile(calls.filter(v => v != null).sort(d3.ascending), .99);
+    const col = d3.scaleSequentialSqrt([0, vmax], d3.interpolateRgb(css("--heat-lo"), css("--heat-hi"))).clamp(true);
+    svg.append("g").selectAll("rect").data(d3.range(N)).join("rect").attr("x", i => m.l + Math.floor(i / 24) * cw).attr("y", i => m.t + (i % 24) * chh)
+      .attr("width", cw + .3).attr("height", chh + .3).attr("fill", i => calls[i] == null ? css("--rule") : col(calls[i]))
+      .on("mousemove", (e, i) => showTip(e, `${fmtT(at(i))}<br>${calls[i] == null ? "buoy offline" : calls[i] + " detections"}`)).on("mouseleave", hideTip);
+    svg.append("g").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(d3.scaleLinear([0, 24], [m.t, h - m.b])).tickValues([0, 6, 12, 18, 24]).tickFormat(v => String(v).padStart(2, "0") + "h")).call(g => g.select(".domain").remove());
+    svg.append("g").attr("transform", `translate(0,${h - m.b})`).call(d3.axisBottom(d3.scaleLinear([0, days], [m.l, w - m.r])).tickValues(d3.range(0, days + 1, 10)).tickFormat(d => "day " + d)).call(g => g.select(".domain").remove()); }
+  reg(draw);
+  const pel = $("#profile"), P = D.analysis.profile, pk = d3.maxIndex(P), lo = d3.minIndex(P);
+  $("#profileNote").textContent = `Mean per hour of day (UTC). Peak at ${String(pk).padStart(2, "0")}:00 (${f(P[pk])}/h), lowest at ${String(lo).padStart(2, "0")}:00 (${f(P[lo])}/h): right whales call more at night.`;
+  function drawP() { const w = W(pel), h = 230, m = { l: 34, r: 6, t: 8, b: 22 }, svg = d3.select(pel).attr("viewBox", `0 0 ${w} ${h}`);
+    const x = d3.scaleBand(d3.range(24), [m.l, w - m.r]).padding(.18), y = d3.scaleLinear([0, d3.max(P) * 1.1], [h - m.b, m.t]);
+    svg.selectAll(".ax").data([0]).join("g").attr("class", "ax").attr("transform", `translate(0,${h - m.b})`).call(d3.axisBottom(x).tickValues([0, 6, 12, 18]).tickFormat(v => String(v).padStart(2, "0") + "h"));
+    svg.selectAll(".ay").data([0]).join("g").attr("class", "ay").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4)).call(g => g.select(".domain").remove());
+    svg.selectAll(".b").data(P).join("rect").attr("class", "b").attr("x", (v, i) => x(i)).attr("width", x.bandwidth()).attr("rx", 1.5)
+      .attr("fill", (v, i) => i === pk ? css("--call") : css("--accent")).attr("y", y).attr("height", v => h - m.b - y(v))
+      .on("mousemove", (e, v) => showTip(e, `${String(P.indexOf(v)).padStart(2, "0")}:00 UTC · ${f(v)} detections/h`)).on("mouseleave", hideTip); }
+  reg(drawP);
+})();
+
+/* ---------------- analysis ---------------- */
+(() => {
+  const A = D.analysis;
+  const items = [[pf(A.adf_p), "ADF p-value", "H₀ unit root", A.adf_p < .05 ? ["rejected", "ok"] : ["not rejected", "warn"]],
+    [pf(A.kpss_p), "KPSS p-value", "H₀ stationary", A.kpss_p < .05 ? ["rejected", "warn"] : ["not rejected", "ok"]],
+    [f(A.stl.seasonal_strength), "STL seasonal strength", "24-hour cycle", A.stl.seasonal_strength > .4 ? ["strong", "ok"] : A.stl.seasonal_strength > .2 ? ["moderate", "ok"] : ["weak", "warn"]],
+    [f(A.stl.trend_strength), "STL trend strength", "slow seasonal rise", [A.stl.trend_strength > .2 ? "present" : "weak", "warn"]],
+    [f(A.acf[24], 3), "ACF at 24 h", "same hour, next day", ["memory", "ok"]]];
+  $("#anaStats").innerHTML = items.map(([v, k, s, [p, c]]) => `<div class="stat"><div class="v">${v}</div><div class="k">${k} · ${s}</div><span class="pill ${c}">${p}</span></div>`).join("") +
+    `<div class="stat" style="grid-column:1/-1"><div class="k">Verdict</div><div style="font-weight:500">${A.verdict.replace(/^./, c => c.toUpperCase())}</div></div>`;
+  const el = $("#acf");
+  function draw() { const w = W(el), h = 230, m = { l: 40, r: 10, t: 10, b: 26 }, svg = d3.select(el).attr("viewBox", `0 0 ${w} ${h}`); svg.selectAll("*").remove();
+    const L = d3.range(1, A.acf.length), x = d3.scaleBand(L, [m.l, w - m.r]).padding(.2), y = d3.scaleLinear([Math.min(-.1, d3.min(A.acf)), Math.max(.5, d3.max(L, l => A.acf[l]))], [h - m.b, m.t]).nice();
+    svg.append("rect").attr("x", m.l).attr("width", w - m.l - m.r).attr("y", y(A.acf_ci)).attr("height", y(-A.acf_ci) - y(A.acf_ci)).attr("fill", css("--accent")).attr("opacity", .12);
+    svg.append("g").attr("transform", `translate(0,${h - m.b})`).call(d3.axisBottom(x).tickValues([12, 24, 36, 48, 60, 72]));
+    svg.append("g").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5)).call(g => g.select(".domain").remove());
+    svg.append("line").attr("x1", m.l).attr("x2", w - m.r).attr("y1", y(0)).attr("y2", y(0)).attr("stroke", css("--muted"));
+    svg.append("g").selectAll("rect").data(L).join("rect").attr("x", l => x(l)).attr("width", x.bandwidth())
+      .attr("fill", l => [24, 48, 72].includes(l) ? css("--call") : Math.abs(A.acf[l]) > A.acf_ci ? css("--accent") : css("--muted"))
+      .attr("y", l => y(Math.max(0, A.acf[l]))).attr("height", l => Math.abs(y(A.acf[l]) - y(0)))
+      .on("mousemove", (e, l) => showTip(e, `lag ${l} h · ACF ${f(A.acf[l], 3)}${Math.abs(A.acf[l]) > A.acf_ci ? "" : " (inside band)"}`)).on("mouseleave", hideTip); }
+  reg(draw);
+})();
+
+/* ---------------- models: AIC grid, metrics, folds ---------------- */
+(() => {
+  const S = D.aic, all = D.aic_all || [], amin = d3.min(all, d => d.aic);
+  $("#aicNote").textContent = `${S.n_models} SARIMA(p,0,q)(P,0,Q)24 models fitted on the first ${S.fit_hours} hours only, before any test fold. Darker = lower AIC. The outlined cell is the choice: ${S.chosen.replace(/ /g, "")}. Crossed cells did not converge.`;
+  $("#modelsLede").textContent = `Five models compete on ${M.folds} rolling 72-hour folds: each is trained only on the hours before its fold. The 80% band is built from each model's own errors on the ${M.n_cal} previous 72-hour forecasts, so it covers real misses instead of assuming normal errors. SARIMAX sees sea temperature only up to the forecast start.`;
+  const grid = $("#aicGrid");
+  const draw = () => { grid.innerHTML = ""; const col = d3.scaleSequentialLog([1, d3.max(all, d => d.aic - amin + 1) || 2], d3.interpolateRgb(css("--heat-hi"), css("--heat-lo")));
+    [[0, 0], [0, 1], [1, 0], [1, 1]].forEach(([P, Q]) => { const box = document.createElement("div");
+      box.innerHTML = `<div class="mono muted" style="font-size:.76rem;margin-bottom:4px">seasonal (P,Q) = (${P},${Q})</div>`;
+      const g = document.createElement("div"); g.style.cssText = "display:grid;grid-template-columns:repeat(3,1fr);gap:3px";
+      for (let p = 0; p < 3; p++) for (let q = 0; q < 3; q++) { const d = all.find(r => r.p === p && r.q === q && r.P === P && r.Q === Q), c = document.createElement("button");
+        const best = d && S.chosen.replace(/ /g, "") === `SARIMA(${p},0,${q})(${P},0,${Q},24)`;
+        c.style.cssText = `aspect-ratio:1.6;border:${best ? "2px solid var(--call)" : "0"};border-radius:3px;cursor:pointer;font:500 .74rem var(--f-mono);color:${d && d.aic - amin < 40 ? "#fff" : "var(--ink)"};background:${d ? col(d.aic - amin + 1) : "var(--rule)"}`;
+        c.textContent = d ? (d.converged ? "" : "× ") + "Δ" + Math.round(d.aic - amin) : "–"; c.setAttribute("aria-label", `p ${p} q ${q}`);
+        const read = () => $("#aicRead").textContent = d ? `SARIMA(${p},0,${q})(${P},0,${Q})24 · AIC ${d.aic} · BIC ${d.bic} · ${d.converged ? "converged" : "did not converge"}${best ? " · chosen" : ""}` : "";
+        c.onmouseenter = read; c.onfocus = read; g.appendChild(c); }
+      box.appendChild(g); box.insertAdjacentHTML("beforeend", `<div class="mono muted" style="font-size:.74rem;margin-top:3px">rows p = 0,1,2 · columns q = 0,1,2</div>`); grid.appendChild(box); }); };
+  reg(draw);
+  let key = "mae"; const el = $("#metChart"), base = new Set(["Naive", "Seasonal naive"]);
+  const NOTE = { mae: "Mean absolute error in detections per hour, averaged over folds. Lower is better.", rmse: "Root mean squared error: punishes big misses. Lower is better.",
+    mase: "MAE scaled by the in-sample error of a one-day-ago forecast. Values above 1 are normal for 72-hour-ahead forecasts.", coverage80: "Share of actual hours inside the 80% band. The target is 0.80." };
+  function drawM() { $("#metNote").textContent = NOTE[key];
+    const data = [...D.models].sort((a, b) => key === "coverage80" ? Math.abs(a[key] - .8) - Math.abs(b[key] - .8) : a[key] - b[key]);
+    const w = W(el), h = 220, m = { l: 120, r: 50, t: 6, b: 24 }, svg = d3.select(el).attr("viewBox", `0 0 ${w} ${h}`);
+    const x = d3.scaleLinear([0, key === "coverage80" ? 1 : d3.max(data, d => d[key]) * 1.1], [m.l, w - m.r]), y = d3.scaleBand(data.map(d => d.model), [m.t, h - m.b]).padding(.3);
+    svg.selectAll(".ax").data([0]).join("g").attr("class", "ax").attr("transform", `translate(0,${h - m.b})`).transition().duration(DUR).call(d3.axisBottom(x).ticks(5));
+    svg.selectAll(".tg").data(key === "coverage80" ? [.8] : []).join("line").attr("class", "tg").attr("x1", x(.8)).attr("x2", x(.8)).attr("y1", m.t).attr("y2", h - m.b).attr("stroke", css("--call")).attr("stroke-dasharray", "4 4");
+    svg.selectAll(".lab").data(data, d => d.model).join("text").attr("class", "lab").attr("x", m.l - 10).attr("text-anchor", "end").style("fill", css("--ink")).style("font", "500 12px IBM Plex Sans, sans-serif")
+      .text(d => d.model).transition().duration(DUR).attr("y", d => y(d.model) + y.bandwidth() / 2 + 4);
+    svg.selectAll(".bar").data(data, d => d.model).join("rect").attr("class", "bar").attr("x", m.l).attr("rx", 2).attr("height", y.bandwidth())
+      .attr("fill", d => d.model === M.model ? css("--accent") : base.has(d.model) ? css("--rule") : css("--muted"))
+      .transition().duration(DUR).attr("y", d => y(d.model)).attr("width", d => x(d[key]) - m.l);
+    svg.selectAll(".val").data(data, d => d.model).join("text").attr("class", "val").style("fill", css("--ink"))
+      .text(d => key === "coverage80" ? (d[key] * 100).toFixed(1) + "%" : f(d[key], 3)).transition().duration(DUR).attr("x", d => x(d[key]) + 6).attr("y", d => y(d.model) + y.bandwidth() / 2 + 4); }
+  seg($("#metSeg"), k => { key = k; drawM(); }); reg(drawM);
+  const fel = $("#foldChart"), models = D.models.map(d => d.model);
+  let hl = null;
+  function drawF() { const w = W(fel), h = 200, m = { l: 40, r: 30, t: 10, b: 26 }, svg = d3.select(fel).attr("viewBox", `0 0 ${w} ${h}`); svg.selectAll("*").remove();
+    const x = d3.scalePoint(d3.range(1, M.folds + 1), [m.l, w - m.r]), y = d3.scaleLinear([0, d3.max(D.per_fold, d => d.mae) * 1.1], [h - m.b, m.t]).nice();
+    const color = mdl => mdl === M.model ? css("--accent") : base.has(mdl) ? css("--rule") : mdl.startsWith("SARIMAX") ? css("--call") : css("--muted");
+    const every = Math.ceil(M.folds / 7);                              // keep fold labels readable when there are many
+    svg.append("g").attr("transform", `translate(0,${h - m.b})`).call(d3.axisBottom(x).tickValues(d3.range(1, M.folds + 1).filter(v => v === 1 || v % every === 0)).tickFormat(v => "fold " + v));
+    svg.append("g").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4)).call(g => g.select(".domain").remove());
+    models.forEach(mdl => { const pts = D.per_fold.filter(d => d.model === mdl); const on = !hl || hl === mdl;
+      svg.append("path").datum(pts).attr("fill", "none").attr("stroke", color(mdl)).attr("stroke-width", mdl === M.model ? 2.6 : 1.6).attr("opacity", on ? 1 : .15).attr("d", d3.line().x(d => x(d.fold)).y(d => y(d.mae)));
+      svg.append("g").selectAll("circle").data(pts).join("circle").attr("cx", d => x(d.fold)).attr("cy", d => y(d.mae)).attr("r", 3.2).attr("fill", color(mdl)).attr("opacity", on ? 1 : .15)
+        .on("mousemove", (e, d) => showTip(e, `${mdl} · fold ${d.fold}<br>MAE ${f(d.mae)} · coverage ${Math.round(d.coverage80 * 100)}%`)).on("mouseleave", hideTip); });
+    $("#foldLegend").innerHTML = models.map(mdl => `<button class="btn" style="padding:5px 8px" data-m="${mdl}" aria-pressed="${hl === mdl}"><i style="background:${color(mdl)}"></i>${mdl}</button>`).join(""); }
+  $("#foldLegend").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; hl = hl === b.dataset.m ? null : b.dataset.m; drawF(); });
+  reg(drawF);
+})();
+
+/* ---------------- forecast, risk strip, scrubber, CUSUM ---------------- */
+(() => {
+  let mode = "backtest", cur = 1, timer = null, th = { backtest: [...M.thresholds.backtest], live: [...M.thresholds.live] };
+  const el = $("#fcChart"), hiS = $("#thHigh"), meS = $("#thMed"), scrub = $("#scrub");
+  const F = () => D[mode];
+  const levels = () => F().hi.map(u => levelOf(u, ...th[mode]));
+  function syncSliders() { const [a, b] = th[mode]; hiS.value = a; meS.value = b; meS.max = a;
+    const o = F().origin, ra = toReal(a, o), rb = toReal(b, o);
+    $("#thHighOut").textContent = `${a.toFixed(1)} det/h${M.recall ? ` ≈ ${ra.toFixed(1)} real calls/h` : ""}`;
+    $("#thMedOut").textContent = `${b.toFixed(1)} det/h${M.recall ? ` ≈ ${rb.toFixed(1)} real calls/h` : ""}`; }
+  let x, y, svg, cursor;
+  function drawChart() { const fc = F(), o = fc.origin, w = W(el), h = 320, m = { l: 40, r: 14, t: 12, b: 28 };
+    svg = d3.select(el).attr("viewBox", `0 0 ${w} ${h}`); svg.selectAll("*").remove();
+    const hist = d3.range(Math.max(0, o - 48), o).map(i => [i - o + 1, calls[i]]);
+    const ymax = d3.max([...fc.hi, ...hist.map(p => p[1] || 0), ...(fc.actual.filter(v => v != null)), th[mode][0] * 1.05]);
+    x = d3.scaleLinear([hist[0][0] - .5, 72.5], [m.l, w - m.r]); y = d3.scaleLinear([0, ymax * 1.08], [h - m.b, m.t]).nice();
+    svg.append("g").attr("transform", `translate(0,${h - m.b})`).call(d3.axisBottom(x).tickValues([-47, -23, 1, 24, 48, 72]).tickFormat(v => v <= 0 ? `${v - 1} h` : `+${v} h`));
+    svg.append("g").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5)).call(g => g.select(".domain").remove());
+    svg.append("rect").attr("x", x(.5)).attr("width", x(72.5) - x(.5)).attr("y", m.t).attr("height", h - m.b - m.t).attr("fill", css("--accent")).attr("opacity", .05);
+    [["HIGH", th[mode][0]], ["MEDIUM", th[mode][1]]].forEach(([k, v]) => {
+      svg.append("line").attr("x1", m.l).attr("x2", w - m.r).attr("y1", y(v)).attr("y2", y(v)).attr("stroke", css(LEVEL_C[k])).attr("stroke-dasharray", "5 4").attr("stroke-width", 1.4);
+      svg.append("text").attr("x", m.l + 6).attr("y", y(v) - 5).style("fill", css(LEVEL_C[k])).text(`${k} ≥ ${v.toFixed(1)}`); });
+    const H = d3.range(72);
+    svg.append("path").datum(H).attr("fill", css("--accent")).attr("opacity", .2).attr("d", d3.area().x(i => x(i + 1)).y0(i => y(fc.lo[i])).y1(i => y(fc.hi[i])).curve(d3.curveMonotoneX));
+    svg.append("path").datum(H).attr("fill", "none").attr("stroke", css("--accent")).attr("stroke-width", 1).attr("stroke-dasharray", "2 3").attr("d", d3.line().x(i => x(i + 1)).y(i => y(fc.hi[i])).curve(d3.curveMonotoneX));
+    svg.append("path").datum(hist).attr("fill", "none").attr("stroke", css("--muted")).attr("stroke-width", 1.4).attr("d", d3.line().defined(p => p[1] != null).x(p => x(p[0])).y(p => y(p[1])).curve(d3.curveStepAfter));
+    const line = svg.append("path").datum(H).attr("fill", "none").attr("stroke", css("--accent")).attr("stroke-width", 2.4).attr("d", d3.line().x(i => x(i + 1)).y(i => y(fc.forecast[i])).curve(d3.curveMonotoneX));
+    if (!reduce) { const L = line.node().getTotalLength(); line.attr("stroke-dasharray", `${L} ${L}`).attr("stroke-dashoffset", L).transition().duration(1100).ease(d3.easeCubicOut).attr("stroke-dashoffset", 0); }
+    svg.append("g").selectAll("circle").data(H.filter(i => fc.actual[i] != null)).join("circle").attr("cx", i => x(i + 1)).attr("cy", i => y(fc.actual[i])).attr("r", 2.6).attr("fill", css("--ink"));
+    svg.append("line").attr("x1", x(.5)).attr("x2", x(.5)).attr("y1", m.t).attr("y2", h - m.b).attr("stroke", css("--ink")).attr("stroke-width", 1);
+    svg.append("text").attr("x", x(.5) + 6).attr("y", m.t + 10).style("fill", css("--ink")).text("forecast issued");
+    cursor = svg.append("g"); cursor.append("line").attr("y1", m.t).attr("y2", h - m.b).attr("stroke", css("--call")).attr("stroke-width", 1.6);
+    cursor.append("circle").attr("r", 5).attr("fill", css("--call"));
+    svg.append("rect").attr("x", x(.5)).attr("width", x(72.5) - x(.5)).attr("y", m.t).attr("height", h - m.t - m.b).attr("fill", "transparent").style("cursor", "crosshair")
+      .on("mousemove click", e => setCur(Math.max(1, Math.min(72, Math.round(x.invert(d3.pointer(e)[0]))))));
+    moveCursor(); }
+  function moveCursor() { const fc = F(); if (!cursor) return; cursor.select("line").attr("x1", x(cur)).attr("x2", x(cur)); cursor.select("circle").attr("cx", x(cur)).attr("cy", y(fc.forecast[cur - 1])); }
+  function strip() { const lv = levels(), s = $("#strip");
+    s.innerHTML = lv.map((l, i) => `<button style="background:var(${LEVEL_C[l]})" aria-label="+${i + 1} h ${l}" class="${i + 1 === cur ? "cur" : ""}" data-h="${i + 1}"></button>`).join("");
+    const wins = windows(lv), counts = d3.rollup(lv, v => v.length, d => d);
+    $("#alerts").innerHTML = wins.length ? wins.map(([a, b]) => `<div><span>+${a} h → +${b} h</span><span>${b - a + 1} h · from ${fmtS(at(F().origin + a - 1))} UTC</span></div>`).join("") : `<div><span>No HIGH-risk windows in these 72 hours.</span></div>`;
+    $("#countsNote").textContent = `LOW ${counts.get("LOW") || 0} h · MEDIUM ${counts.get("MEDIUM") || 0} h · HIGH ${counts.get("HIGH") || 0} h. Windows separated by one lower hour are merged into one alert.`; }
+  function panel() { const fc = F(), i = cur - 1, lv = levels()[i], t = at(fc.origin + i);
+    $("#scrubOut").textContent = "+" + cur + " h"; scrub.value = cur;
+    $("#console").innerHTML = `<dt>Time</dt><dd>${fmtT(t)}</dd><dt>Forecast</dt><dd>${f(fc.forecast[i])} detections/h</dd>
+      <dt>80% band</dt><dd>${f(fc.lo[i])} – ${f(fc.hi[i])}</dd>${fc.actual[i] != null ? `<dt>Actual</dt><dd>${fc.actual[i]} ${fc.actual[i] >= fc.lo[i] && fc.actual[i] <= fc.hi[i] ? "· inside band" : "· outside band"}</dd>` : ""}
+      <dt>Risk</dt><dd style="color:var(${LEVEL_C[lv]})">${lv}</dd>`;
+    const a = $("#advice"); a.textContent = ADVICE[lv]; a.style.background = `var(${LEVEL_C[lv]})`;
+    $("#strip").querySelectorAll("button").forEach((b, k) => b.classList.toggle("cur", k === i)); moveCursor(); }
+  function setCur(h) { cur = h; panel(); }
+  function all() { syncSliders(); drawChart(); strip(); panel(); cusum(); }
+  $("#strip").addEventListener("click", e => { const b = e.target.closest("button"); if (b) setCur(+b.dataset.h); });
+  scrub.oninput = () => setCur(+scrub.value);
+  hiS.oninput = () => { th[mode][0] = +hiS.value; th[mode][1] = Math.min(th[mode][1], th[mode][0]); all(); };
+  meS.oninput = () => { th[mode][1] = +meS.value; all(); };
+  $("#thReset").onclick = () => { th[mode] = [...M.thresholds[mode]]; all(); };
+  seg($("#modeSeg"), k => { mode = k; cur = 1; all(); });
+  $("#playBtn").onclick = () => { if (timer) { clearInterval(timer); timer = null; $("#playBtn").textContent = "Play 72 h"; return; }
+    $("#playBtn").textContent = "Stop"; if (cur >= 72) cur = 0;
+    timer = setInterval(() => { if (cur >= 72) { clearInterval(timer); timer = null; $("#playBtn").textContent = "Play 72 h"; return; } setCur(cur + 1); }, reduce ? 250 : 90); };
+  // CUSUM, computed here from actual vs forecast exactly as risk.cusum does
+  const ck = $("#ck"), chh = $("#chh"); ck.value = M.cusum.k; chh.value = M.cusum.h; const cel = $("#cusumChart");
+  function cusum() { $("#ckOut").textContent = (+ck.value).toFixed(1); $("#chOut").textContent = (+chh.value).toFixed(1);
+    const fc = D.backtest, k = +ck.value, hh = +chh.value, sig = M.cusum.sigma; let s = 0, alarm = null;
+    const st = fc.forecast.map((v, i) => {   /* offline hours (null) add nothing */ if (fc.actual[i] != null) s = Math.max(0, s + (fc.actual[i] - v) / sig - k);; if (alarm == null && s > hh) alarm = i + 1; return s; });
+    $("#cusumNote").textContent = `Backtest only, because it needs actual counts. Each hour adds (actual − forecast) / σ − k, with σ = ${f(sig)} = the spread of this model's past 72-hour forecast errors; the sum never drops below 0. Crossing h raises the alarm: ` +
+      (alarm ? `here at +${alarm} h, when calls rose faster than forecast.` : "no alarm with these settings.");
+    const w = W(cel), h = 200, m = { l: 40, r: 14, t: 10, b: 26 }, svg = d3.select(cel).attr("viewBox", `0 0 ${w} ${h}`); svg.selectAll("*").remove();
+    const x = d3.scaleLinear([1, 72], [m.l, w - m.r]), y = d3.scaleLinear([0, Math.max(hh * 1.3, d3.max(st))], [h - m.b, m.t]).nice();
+    svg.append("g").attr("transform", `translate(0,${h - m.b})`).call(d3.axisBottom(x).tickValues([1, 24, 48, 72]).tickFormat(v => "+" + v + " h"));
+    svg.append("g").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4)).call(g => g.select(".domain").remove());
+    svg.append("line").attr("x1", m.l).attr("x2", w - m.r).attr("y1", y(hh)).attr("y2", y(hh)).attr("stroke", css("--high")).attr("stroke-dasharray", "5 4");
+    svg.append("text").attr("x", w - m.r - 4).attr("y", y(hh) - 5).attr("text-anchor", "end").style("fill", css("--high")).text("alarm level h");
+    svg.append("path").datum(st).attr("fill", css("--accent")).attr("opacity", .15).attr("d", d3.area().x((v, i) => x(i + 1)).y0(y(0)).y1(v => y(v)));
+    svg.append("path").datum(st).attr("fill", "none").attr("stroke", css("--accent")).attr("stroke-width", 2).attr("d", d3.line().x((v, i) => x(i + 1)).y(v => y(v)));
+    if (alarm) { svg.append("circle").attr("cx", x(alarm)).attr("cy", y(st[alarm - 1])).attr("r", 6).attr("fill", css("--high"));
+      svg.append("text").attr("x", x(alarm) + 9).attr("y", y(st[alarm - 1]) + 4).style("fill", css("--high")).text(`alarm +${alarm} h`); } }
+  ck.oninput = cusum; chh.oninput = cusum;
+  reg(all);
+})();
+
+/* ---------------- diagnostics ---------------- */
+(() => {
+  const R = D.resid;
+  $("#diagLede").textContent = `One-step residuals of the ${M.model} fit on the last fold (${R.n} hours, after dropping the first 25 start-up values). If the model had captured everything, they would be white noise.`;
+  const items = [[pf(R.ljung_box_p_24), "Ljung-Box p, lag 24", R.ljung_box_p_24 >= .05], [pf(R.ljung_box_p_48), "Ljung-Box p, lag 48", R.ljung_box_p_48 >= .05],
+    [pf(R.jarque_bera_p), "Jarque-Bera p (normality)", R.jarque_bera_p >= .05], [f(R.skew), "skew", Math.abs(R.skew) < .5], [f(R.excess_kurtosis), "excess kurtosis", Math.abs(R.excess_kurtosis) < 1]];
+  $("#diagStats").innerHTML = items.map(([v, k, ok]) => `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div><span class="pill ${ok ? "ok" : "warn"}">${ok ? "passes" : "flagged"}</span></div>`).join("");
+  $("#diagVerdict").textContent = R.verdict;
+  const el = $("#racf");
+  function draw() { const w = W(el), h = 200, m = { l: 40, r: 10, t: 10, b: 26 }, svg = d3.select(el).attr("viewBox", `0 0 ${w} ${h}`); svg.selectAll("*").remove();
+    const L = d3.range(1, R.acf.length), x = d3.scaleBand(L, [m.l, w - m.r]).padding(.2), lim = Math.max(R.acf_ci * 2, d3.max(L, l => Math.abs(R.acf[l]))) * 1.15, y = d3.scaleLinear([-lim, lim], [h - m.b, m.t]);
+    svg.append("rect").attr("x", m.l).attr("width", w - m.l - m.r).attr("y", y(R.acf_ci)).attr("height", y(-R.acf_ci) - y(R.acf_ci)).attr("fill", css("--accent")).attr("opacity", .12);
+    svg.append("g").attr("transform", `translate(0,${y(0)})`).call(d3.axisBottom(x).tickValues([12, 24, 36, 48]).tickSize(0)).call(g => g.selectAll("text").attr("dy", "1.6em"));
+    svg.append("g").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4)).call(g => g.select(".domain").remove());
+    svg.append("g").selectAll("rect").data(L).join("rect").attr("x", l => x(l)).attr("width", x.bandwidth())
+      .attr("fill", l => Math.abs(R.acf[l]) > R.acf_ci ? css("--high") : css("--muted")).attr("y", l => y(Math.max(0, R.acf[l]))).attr("height", l => Math.abs(y(R.acf[l]) - y(0)))
+      .on("mousemove", (e, l) => showTip(e, `lag ${l} h · residual ACF ${f(R.acf[l], 3)}`)).on("mouseleave", hideTip); }
+  reg(draw);
+})();
+
+$("#honesty").innerHTML = M.simulated
+  ? `The hourly season on this page is <b>simulated</b>: 60 days built to match patterns seen in real buoy data (night-time calling, a rise with sea temperature, persistence and two buoy outages). It is passed through the detector's measured recall and precision, so the forecaster sees what a buoy would report. The detector scores come from <b>real ${M.detector_source}</b> clips. Treat the forecast and risk numbers as a demonstration of the method, not as real measurements.`
+  : `${M.source_note || `The hourly series on this page is <b>real buoy data</b> (${M.source}).`} Risk thresholds are applied to the buoy's own counts; check them against local guidance before relying on them.`;
+</script>

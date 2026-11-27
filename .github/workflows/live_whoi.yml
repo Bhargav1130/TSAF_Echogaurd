@@ -1,0 +1,41 @@
+# Fetches live WHOI Cape Cod Bay buoy detections every hour on GitHub's servers
+# (dcs.whoi.edu is blocked on some home networks) and commits data/live_hourly.csv.
+# On the laptop:  python run_all.py --skip-detector --hourly-csv data/live_hourly.csv
+name: live WHOI data
+
+on:
+  schedule:
+    - cron: "17 * * * *"      # every hour at :17 UTC
+  workflow_dispatch: {}       # "Run workflow" button in the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: live-whoi
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "numpy>=1.24" "pandas>=2.2"
+      - name: Restore cached WHOI day pages
+        uses: actions/cache@v4
+        with:
+          path: data/whoi_cache
+          key: whoi-${{ github.run_id }}
+          restore-keys: whoi-
+      - run: python fetch_whoi.py --days 60 --out data/live_hourly.csv
+      - name: Commit if the data changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/live_hourly.csv
+          git diff --cached --quiet || git commit -m "live WHOI data $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push

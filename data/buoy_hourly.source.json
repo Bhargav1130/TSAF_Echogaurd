@@ -1,0 +1,4 @@
+{
+ "name": "NOAA DCLDE 2027 Cape Cod Bay right whale detections",
+ "note": "Real right whale up-calls recorded in Cape Cod Bay, Massachusetts, 17 Feb - 12 Jun 2019, from one of five seafloor recorders (Garcia & Tolkova et al. 2025, NOAA NCEI passive acoustic archive). Counts come from the dataset's own automated up-call detector (score >= 0.75: precision 0.857, recall 0.896); EchoGuard's MiniRocket detector is evaluated separately on Kaggle clips."
+}
