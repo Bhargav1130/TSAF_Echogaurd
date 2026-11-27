@@ -18,8 +18,11 @@ def thresholds(history=None, recall=1.0, precision=1.0):
 
 
 def risk_levels(upper, high, medium):
-    """Risk from the UPPER bound of the 80 % interval (a missed whale costs more
-    than an extra alert)."""
+    """Risk from the risk bound (forecast.risk_bound: 75 % quantile of forecast +
+    past errors at the same hour of day), so HIGH = at least a 25 % chance of the
+    HIGH threshold. A missed whale costs more than an extra alert, hence not the median.
+    The upper edge of the pooled 80 % band was used before: on bursty live data it
+    was above the threshold in every hour."""
     u = np.asarray(upper, float)
     return np.where(u >= high, "HIGH", np.where(u >= medium, "MEDIUM", "LOW"))
 

@@ -182,11 +182,12 @@ def run_forecasting(h, y, args, rates=(1.0, 1.0)):
     s = lf["origin"]
     idx = y.index
     t = idx[s:s + C.HORIZON]
-    fc = pd.DataFrame({"timestamp": t, "actual": lf["actual"], "forecast": lf["mean"], "lo80": lf["lo"], "hi80": lf["hi"]})
+    fc = pd.DataFrame({"timestamp": t, "actual": lf["actual"], "forecast": lf["mean"], "lo80": lf["lo"], "hi80": lf["hi"],
+                       "risk_bound": lf["risk"]})
     th_bt = risk.thresholds(y.to_numpy()[:s], *rates)
     print(f"risk thresholds: HIGH >= {th_bt[0]}, MEDIUM >= {th_bt[1]} calls/h on this series "
           f"(= {C.HIGH_THRESHOLD} / {C.MEDIUM_THRESHOLD} real calls/h, recall {rates[0]:.2f}, precision {rates[1]:.2f})")
-    fc["risk"] = risk.risk_levels(fc.hi80, *th_bt)
+    fc["risk"] = risk.risk_levels(fc.risk_bound, *th_bt)
     fc["hour_ahead"] = np.arange(1, len(fc) + 1)
     _num_round(fc).to_csv(C.OUT_DIR / "forecast_backtest.csv", index=False)
     plots.forecast_plot(idx[s - 48:s], y.to_numpy()[s - 48:s], t, lf["actual"], lf["mean"], lf["lo"], lf["hi"],
@@ -198,9 +199,10 @@ def run_forecasting(h, y, args, rates=(1.0, 1.0)):
     run = forecast.model_runner(best, y.to_numpy(), exog, C.HORIZON, model_kw.get(best))
     live_r = forecast.empirical_interval(run, h["calls"].to_numpy(), len(y))   # calibrate on observed hours only
     t_live = pd.date_range(idx[-1] + pd.Timedelta("1h"), periods=C.HORIZON, freq="h")
-    live = pd.DataFrame({"timestamp": t_live, "actual": np.nan, "forecast": live_r["mean"], "lo80": live_r["lo"], "hi80": live_r["hi"]})
+    live = pd.DataFrame({"timestamp": t_live, "actual": np.nan, "forecast": live_r["mean"], "lo80": live_r["lo"], "hi80": live_r["hi"],
+                         "risk_bound": live_r["risk"]})
     th_live = risk.thresholds(y.to_numpy(), *rates)
-    live["risk"] = risk.risk_levels(live.hi80, *th_live)
+    live["risk"] = risk.risk_levels(live.risk_bound, *th_live)
     live["hour_ahead"] = np.arange(1, C.HORIZON + 1)
     _num_round(live).to_csv(C.OUT_DIR / "forecast_live.csv", index=False)
     search = {"chosen": chosen, "fit_hours": origin0, "n_models": len(aic),

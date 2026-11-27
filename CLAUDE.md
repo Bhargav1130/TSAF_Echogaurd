@@ -27,7 +27,7 @@ pip install -r requirements.txt
 python run_all.py              :: full pipeline, ~2 min (incl. ~35 s AIC grid), writes outputs/
 python run_all.py --skip-detector
 streamlit run app.py           :: dashboard
-python -m pytest -q            :: 16 tests
+python -m pytest -q            :: 17 tests
 python fetch_whoi.py           :: real near real-time WHOI buoy data -> data/buoy_hourly.csv
 ```
 Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
@@ -35,7 +35,7 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
 
 ## Code map
 - `echoguard/config.py` – all settings (band 50-250 Hz, 2-s windows / 1-s hop, horizon 72, 5 folds,
-  80% interval, N_CAL 5, HIGH >= 5 / MEDIUM >= 3.5 REAL calls/h on the upper bound, CUSUM k=0.5 h=4, seed 7).
+  80% interval, N_CAL 5, HIGH >= 5 / MEDIUM >= 3.5 REAL calls/h on the risk bound (RISK_QUANTILE 0.75), CUSUM k=0.5 h=4, seed 7).
 - `audio.py` – simulated labelled clips, Kaggle loader, windowing, Butterworth band-pass, STFT, MFCC (own impl), Welch.
 - `detect.py` – Energy threshold, MFCC + logistic regression, MiniRocket (own NumPy implementation, no sktime).
   MiniRocket runs on each window's **time-frequency contour** (dominant frequency + log band power per STFT frame),
@@ -62,13 +62,18 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   Offline hours: models TRAIN on the gap-filled series, but walk_forward(actual=raw calls with NaN) SCORES only
   observed hours: MAE/RMSE/coverage, interval-calibration errors, live calibration and risk.cusum all skip NaN.
   (Before 27 Nov 2026 fold 1's calibration counted the 12 interpolated outage hours as real.)
-- `risk.py` – risk from upper 80% bound. `thresholds(history, recall, precision)` converts the real-call
+- `risk.py` – risk from the risk bound (`forecast.risk_bound`: 75% quantile of forecast + past 72-h errors at the
+  SAME hour of day, i.e. HIGH = at least 25% chance of the threshold; columns risk_bound / site `rb`). Replaced the
+  pooled upper 80% bound on 27 Nov 2026: on bursty live data (57% zero hours) that bound was ~21-27 every hour, so
+  risk was HIGH for all 72 h (last fold: 72 HIGH, only 12 of 70 hours had >= 5 calls). Tested over 8 live folds:
+  q 0.75 -> HIGH 39% of hours, precision 0.39 (base 0.29), HIGH+MEDIUM catch 72% of >= 5-call hours. Hourly
+  72-h-ahead skill is modest (Brier ~ climatology). `thresholds(history, recall, precision)` converts the real-call
   thresholds to the series scale: recall x T + (1 - precision) x mean detections (false alarms); rounded to 0.1
   (= dashboard slider step). HIGH windows merged across gaps <= 1 h. One-sided CUSUM on 72-h forecast errors
   standardised by err_sd (std of past 72-h forecast errors), not by the raw series std. Advice text.
   A threshold relative to the recent mean was tried and rejected: it rises in busy periods and hides alerts.
 - `plots.py`, `run_all.py` (orchestrates 5 stages, writes outputs/*.csv, summary.json, figures/), `app.py` (Streamlit;
-  `full_width()` helper; slider defaults come from summary.json risk.thresholds), `tests/test_echoguard.py` (15).
+  `full_width()` helper; slider defaults come from summary.json risk.thresholds), `tests/test_echoguard.py` (17).
 - `site/` – interactive showcase website. `template.html` (page + D3 7.8.5 from cdnjs with SRI) and
   `build_site.py`, which injects outputs/ data and writes `echoguard.html` (Artifact body, published at
   https://claude.ai/artifact/C775C6y5j4wpnjGLhD6shn — republish that file to keep the URL) and `index.html`
@@ -100,7 +105,9 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
 - ADF 0.001 / KPSS 0.01, STL seasonal 0.22 / trend 0.13, ACF24 0.250, peak 01:00 UTC, daily calls vs SST r = -0.65.
 - AIC best SARIMA(2,0,2)(0,0,0)24. 5 folds from hour 1061: SARIMA MAE 7.09 MASE 2.18 cov 82% | SARIMAX 8.24 / 66% |
   Seasonal naive 8.86 / 72% | HW 10.38 / 51% | Naive 13.54 / 61%. MASE > 1: bursty calls.
-- Live forecast from 27 Nov 09:00 UTC: HIGH all 72 h (80% upper bound ~20 > 5). Last fold 67/72 inside band.
+- Live forecast from 27 Nov 09:00 UTC with the risk bound: LOW 26 / MEDIUM 3 / HIGH 43 h, HIGH windows around the
+  night-time call peak each day. Backtest last fold: LOW 23 / MEDIUM 6 / HIGH 43, every >= 5-call hour flagged
+  HIGH or MEDIUM, HIGH precision 0.28. Last fold 67/72 inside band. (Old upper-bound rule: HIGH all 72 h.)
 - Interval fix (27 Nov): empirical_interval floors lo / ceils hi (integer counts); before, SARIMA covered 41%.
   The 2019 numbers below predate it; 2019 outputs backed up in the scratchpad (real2019_outputs).
 - Website v6 = this run; hero "risk next hour" now uses the live forecast (was the backtest fold).

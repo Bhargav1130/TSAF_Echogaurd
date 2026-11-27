@@ -27,8 +27,11 @@ N_CAL = 5                   # past 72-h forecasts used to calibrate the interval
 # ---- risk ----
 # In REAL calls per hour. When the series is what a detector reports, risk.thresholds()
 # converts them with the detector's recall and precision.
-HIGH_THRESHOLD = 5.0        # upper bound >= this -> HIGH
-MEDIUM_THRESHOLD = 3.5      # upper bound >= this -> MEDIUM
+HIGH_THRESHOLD = 5.0        # risk bound >= this -> HIGH
+MEDIUM_THRESHOLD = 3.5      # risk bound >= this -> MEDIUM
+# risk bound = this quantile of (forecast + past 72-h errors at the same hour of day):
+# HIGH means at least a 1 - 0.75 = 25 % chance of reaching the HIGH threshold
+RISK_QUANTILE = 0.75
 CUSUM_K = 0.5               # CUSUM slack (in units of the std of past 72-h forecast errors)
 CUSUM_H = 4.0               # CUSUM alarm level
 

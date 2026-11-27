@@ -45,9 +45,9 @@ st.sidebar.caption("North Atlantic right whale presence forecast")
 mode = st.sidebar.radio("Forecast to show", ["Backtest (last fold, with actuals)", "Live (next 72 h after the data)"])
 fc = load("forecast_backtest.csv") if mode.startswith("Backtest") else load("forecast_live.csv")
 th = summary["risk"].get("thresholds", {}).get("backtest" if mode.startswith("Backtest") else "live", [5.0, 3.5])
-high_t = st.sidebar.slider("HIGH if upper bound ≥ (calls/h)", 0.5, 15.0, round(float(th[0]), 1), 0.1,
+high_t = st.sidebar.slider("HIGH if risk bound ≥ (calls/h)", 0.5, 15.0, round(float(th[0]), 1), 0.1,
                            help=f"Default = {C.HIGH_THRESHOLD} real calls/h, converted to detector counts when the series is detector output")
-med_t = st.sidebar.slider("MEDIUM if upper bound ≥ (calls/h)", 0.1, high_t, min(round(float(th[1]), 1), high_t), 0.1,
+med_t = st.sidebar.slider("MEDIUM if risk bound ≥ (calls/h)", 0.1, high_t, min(round(float(th[1]), 1), high_t), 0.1,
                           help=f"Default = {C.MEDIUM_THRESHOLD} real calls/h, converted to detector counts when the series is detector output")
 gap = st.sidebar.slider("Join HIGH windows separated by ≤ (hours)", 0, 3, 1)
 st.sidebar.markdown("---")
@@ -55,14 +55,14 @@ st.sidebar.caption(f"Data: {summary['data_source']}")
 st.sidebar.caption(f"Model: {summary['dashboard_model']}")
 
 fc = fc.copy()
-fc["risk"] = risk.risk_levels(fc.hi80, high=high_t, medium=med_t)
+fc["risk"] = risk.risk_levels(fc.risk_bound, high=high_t, medium=med_t)
 wins = risk.alert_windows(list(fc.hour_ahead), list(fc.risk), max_gap=gap)
 hourly = load("hourly_series.csv")
 
 # ---------------------------------------------------------------- header
 st.title("🐋 EchoGuard — whale presence risk")
 issued = fc.timestamp.iloc[0]
-st.caption(f"Forecast issued {issued:%d %b %Y %H:%M} UTC · 72-hour horizon · risk set from the upper 80% bound")
+st.caption(f"Forecast issued {issued:%d %b %Y %H:%M} UTC · 72-hour horizon · risk = 75% quantile of forecast + past errors at that hour of day")
 if "SIMULATED" in summary["data_source"]:
     st.info("Results are from a simulated buoy season. Run `python run_all.py --hourly-csv <file>` with real data to replace them.")
 
@@ -95,6 +95,7 @@ with left:
     ax.plot(h48.index, h48.values, color="#9aa3ad", lw=1, label="History")
     ax.fill_between(fc.timestamp, fc.lo80, fc.hi80, color="#2a6fdb", alpha=0.18, label="80% interval")
     ax.plot(fc.timestamp, fc.forecast, color="#2a6fdb", lw=1.6, label="Forecast")
+    ax.plot(fc.timestamp, fc.risk_bound, color="#2a6fdb", lw=0.9, ls="--", label="Risk bound")
     if fc.actual.notna().any():
         ax.plot(fc.timestamp, fc.actual, color="#222", lw=0.9, marker=".", ms=3, label="Actual")
     ax.axhline(high_t, color=COLORS["HIGH"], ls=":", lw=1)

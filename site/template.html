@@ -282,14 +282,14 @@ footer { padding-block: 48px 64px }
   <div class="sec-head">
     <div class="eyebrow">Station 6 · Warn</div>
     <h2>The next 72 hours</h2>
-    <p class="muted">Risk comes from the upper edge of the 80% band: a missed whale costs more than an extra alert. Scrub through the hours, play the forecast, or move the thresholds and watch the warnings change.</p>
+    <p class="muted">Risk comes from the risk bound: the 75% quantile of the forecast plus past errors made at the same hour of day. HIGH means at least a 25% chance of crossing the HIGH threshold; a missed whale costs more than an extra alert. Scrub through the hours, play the forecast, or move the thresholds and watch the warnings change.</p>
   </div>
   <div class="controls">
     <div class="ctl"><label>Forecast</label><div class="seg" id="modeSeg">
       <button class="btn" data-k="backtest" aria-pressed="true">Backtest (with actuals)</button>
       <button class="btn" data-k="live" aria-pressed="false">Live (after the data)</button></div></div>
-    <div class="ctl"><label for="thHigh">HIGH if upper ≥ <output id="thHighOut"></output></label><input type="range" id="thHigh" min="0.5" max="8" step="0.1"></div>
-    <div class="ctl"><label for="thMed">MEDIUM if upper ≥ <output id="thMedOut"></output></label><input type="range" id="thMed" min="0.3" max="8" step="0.1"></div>
+    <div class="ctl"><label for="thHigh">HIGH if risk bound ≥ <output id="thHighOut"></output></label><input type="range" id="thHigh" min="0.5" max="8" step="0.1"></div>
+    <div class="ctl"><label for="thMed">MEDIUM if risk bound ≥ <output id="thMedOut"></output></label><input type="range" id="thMed" min="0.3" max="8" step="0.1"></div>
     <button class="btn" id="thReset">Reset thresholds</button>
   </div>
   <svg id="fcChart" class="chart" height="320"></svg>
@@ -394,7 +394,7 @@ const toReal = (t, o) => M.recall ? (t - (1 - M.precision) * meanBefore(o)) / M.
 /* ---------------- hero: risk now + chips ---------------- */
 function heroRisk() {
   // the hour right after the data (live forecast), not the backtest fold
-  const lf = D.live, [hi, me] = M.thresholds.live, lv = levelOf(lf.hi[0], hi, me);
+  const lf = D.live, [hi, me] = M.thresholds.live, lv = levelOf(lf.rb[0], hi, me);
   $("#riskNow").innerHTML = `<div class="risk-badge" style="background:var(${LEVEL_C[lv]})">${lv}</div>
     <div class="eyebrow" style="color:var(--muted)">Risk, next hour</div>
     <div class="mono" style="font-size:.85rem">For ${fmtT(new Date(lf.t[0].replace(" ", "T") + ":00Z"))}<br>${ADVICE[lv]}</div>`;
@@ -474,8 +474,8 @@ heroRisk();
       [[pf(D.analysis.adf_p), "ADF p"], [f(D.analysis.stl.seasonal_strength), "seasonal strength"], [f(D.analysis.acf[24], 3), "ACF at 24 h"]], "#analysis"],
     ["Forecast", "5 models", "Naive, seasonal naive, Holt-Winters, SARIMA and SARIMAX with sea temperature, tested on " + M.folds + " rolling 72-hour folds.",
       [[best.model, "best by MAE"], [f(best.mae), "MAE (calls/h)"], [Math.round(best.coverage80 * 100) + "%", "80% band coverage"]], "#models"],
-    ["Warn", "Risk + CUSUM", "The upper edge of the 80% band sets LOW, MEDIUM or HIGH; HIGH hours merge into alert windows; CUSUM flags sudden rises.",
-      [[M.thresholds.backtest[0], "HIGH threshold (det/h)"], [windows(D.backtest.hi.map(u => levelOf(u, ...M.thresholds.backtest))).length, "alert windows"], [M.cusum.alarm == null ? "none" : "+" + M.cusum.alarm + " h", "CUSUM alarm"]], "#forecast"]];
+    ["Warn", "Risk + CUSUM", "The risk bound (75% quantile at that hour of day) sets LOW, MEDIUM or HIGH; HIGH hours merge into alert windows; CUSUM flags sudden rises.",
+      [[M.thresholds.backtest[0], "HIGH threshold (det/h)"], [windows(D.backtest.rb.map(u => levelOf(u, ...M.thresholds.backtest))).length, "alert windows"], [M.cusum.alarm == null ? "none" : "+" + M.cusum.alarm + " h", "CUSUM alarm"]], "#forecast"]];
   const pipe = $("#pipe"), box = $("#stageDetail");
   pipe.innerHTML = S.map((s, i) => `<button class="stage" style="--i:${i}" aria-pressed="${i === 0}" data-i="${i}"><span class="n">0${i + 1}</span><b>${s[0]}</b><span>${s[1]}</span></button>`).join("");
   const show = i => { const s = S[i]; pipe.querySelectorAll(".stage").forEach((b, k) => b.setAttribute("aria-pressed", k === i));
@@ -714,7 +714,7 @@ heroRisk();
   let mode = "backtest", cur = 1, timer = null, th = { backtest: [...M.thresholds.backtest], live: [...M.thresholds.live] };
   const el = $("#fcChart"), hiS = $("#thHigh"), meS = $("#thMed"), scrub = $("#scrub");
   const F = () => D[mode];
-  const levels = () => F().hi.map(u => levelOf(u, ...th[mode]));
+  const levels = () => F().rb.map(u => levelOf(u, ...th[mode]));
   function syncSliders() { const [a, b] = th[mode]; hiS.max = Math.max(8, Math.ceil(a * 2)); hiS.value = a; meS.value = b; meS.max = a;
     const o = F().origin, ra = toReal(a, o), rb = toReal(b, o);
     $("#thHighOut").textContent = `${a.toFixed(1)} det/h${M.recall ? ` ≈ ${ra.toFixed(1)} real calls/h` : ""}`;
@@ -723,7 +723,7 @@ heroRisk();
   function drawChart() { const fc = F(), o = fc.origin, w = W(el), h = 320, m = { l: 40, r: 14, t: 12, b: 28 };
     svg = d3.select(el).attr("viewBox", `0 0 ${w} ${h}`); svg.selectAll("*").remove();
     const hist = d3.range(Math.max(0, o - 48), o).map(i => [i - o + 1, calls[i]]);
-    const ymax = d3.max([...fc.hi, ...hist.map(p => p[1] || 0), ...(fc.actual.filter(v => v != null)), th[mode][0] * 1.05]);
+    const ymax = d3.max([...fc.hi, ...fc.rb, ...hist.map(p => p[1] || 0), ...(fc.actual.filter(v => v != null)), th[mode][0] * 1.05]);
     x = d3.scaleLinear([hist[0][0] - .5, 72.5], [m.l, w - m.r]); y = d3.scaleLinear([0, ymax * 1.08], [h - m.b, m.t]).nice();
     svg.append("g").attr("transform", `translate(0,${h - m.b})`).call(d3.axisBottom(x).tickValues([-47, -23, 1, 24, 48, 72]).tickFormat(v => v <= 0 ? `${v - 1} h` : `+${v} h`));
     svg.append("g").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5)).call(g => g.select(".domain").remove());
@@ -733,7 +733,7 @@ heroRisk();
       svg.append("text").attr("x", m.l + 6).attr("y", y(v) - 5).style("fill", css(LEVEL_C[k])).text(`${k} ≥ ${v.toFixed(1)}`); });
     const H = d3.range(72);
     svg.append("path").datum(H).attr("fill", css("--accent")).attr("opacity", .2).attr("d", d3.area().x(i => x(i + 1)).y0(i => y(fc.lo[i])).y1(i => y(fc.hi[i])).curve(d3.curveMonotoneX));
-    svg.append("path").datum(H).attr("fill", "none").attr("stroke", css("--accent")).attr("stroke-width", 1).attr("stroke-dasharray", "2 3").attr("d", d3.line().x(i => x(i + 1)).y(i => y(fc.hi[i])).curve(d3.curveMonotoneX));
+    svg.append("path").datum(H).attr("fill", "none").attr("stroke", css("--accent")).attr("stroke-width", 1).attr("stroke-dasharray", "2 3").attr("d", d3.line().x(i => x(i + 1)).y(i => y(fc.rb[i])).curve(d3.curveMonotoneX));
     svg.append("path").datum(hist).attr("fill", "none").attr("stroke", css("--muted")).attr("stroke-width", 1.4).attr("d", d3.line().defined(p => p[1] != null).x(p => x(p[0])).y(p => y(p[1])).curve(d3.curveStepAfter));
     const line = svg.append("path").datum(H).attr("fill", "none").attr("stroke", css("--accent")).attr("stroke-width", 2.4).attr("d", d3.line().x(i => x(i + 1)).y(i => y(fc.forecast[i])).curve(d3.curveMonotoneX));
     if (!reduce) { const L = line.node().getTotalLength(); line.attr("stroke-dasharray", `${L} ${L}`).attr("stroke-dashoffset", L).transition().duration(1100).ease(d3.easeCubicOut).attr("stroke-dashoffset", 0); }
@@ -754,7 +754,7 @@ heroRisk();
   function panel() { const fc = F(), i = cur - 1, lv = levels()[i], t = at(fc.origin + i);
     $("#scrubOut").textContent = "+" + cur + " h"; scrub.value = cur;
     $("#console").innerHTML = `<dt>Time</dt><dd>${fmtT(t)}</dd><dt>Forecast</dt><dd>${f(fc.forecast[i])} detections/h</dd>
-      <dt>80% band</dt><dd>${f(fc.lo[i])} – ${f(fc.hi[i])}</dd>${fc.actual[i] != null ? `<dt>Actual</dt><dd>${fc.actual[i]} ${fc.actual[i] >= fc.lo[i] && fc.actual[i] <= fc.hi[i] ? "· inside band" : "· outside band"}</dd>` : ""}
+      <dt>80% band</dt><dd>${f(fc.lo[i])} – ${f(fc.hi[i])}</dd><dt>Risk bound</dt><dd>${f(fc.rb[i])}</dd>${fc.actual[i] != null ? `<dt>Actual</dt><dd>${fc.actual[i]} ${fc.actual[i] >= fc.lo[i] && fc.actual[i] <= fc.hi[i] ? "· inside band" : "· outside band"}</dd>` : ""}
       <dt>Risk</dt><dd style="color:var(${LEVEL_C[lv]})">${lv}</dd>`;
     const a = $("#advice"); a.textContent = ADVICE[lv]; a.style.background = `var(${LEVEL_C[lv]})`;
     $("#strip").querySelectorAll("button").forEach((b, k) => b.classList.toggle("cur", k === i)); moveCursor(); }

@@ -155,8 +155,25 @@ def empirical_interval(run, y, s, h=C.HORIZON, n_cal=C.N_CAL, alpha=C.INTERVAL_A
     # calls are whole numbers: round the band outwards, else a lower bound of 0.14 calls/h
     # leaves every zero-call hour outside it (sparse live WHOI data: 80% band covered 41%)
     r.update(lo=np.floor(np.clip(r["mean"] + q_lo, 0, None)), hi=np.ceil(r["mean"] + q_hi),
-             err_sd=float(errs.std()), n_cal=len(cal))
+             err_sd=float(errs.std()), n_cal=len(cal),
+             risk=risk_bound(r["mean"], y, run, cal, h))
     return r
+
+
+def risk_bound(mean, y, run, cal, h=C.HORIZON, q=C.RISK_QUANTILE):
+    """Per forecast hour: the q-quantile of forecast + past 72-h errors made at the
+    SAME hour of day (origins are 72 h = 3 days apart, so step i of every past
+    forecast falls on the same clock hour). Calls cluster at certain hours, so a
+    pooled band is as wide at 14:00 as at 01:00; on bursty live WHOI data its upper
+    edge passed the HIGH threshold in every hour and risk was HIGH for 72 h."""
+    E = np.array([y[c:c + h] - run(c)["mean"] for c in cal])           # (n_cal, h)
+    pooled = E[~np.isnan(E)]
+    out = []
+    for i in range(h):
+        e = E[:, [j for j in range(h) if j % C.SEASON == i % C.SEASON]].ravel()
+        e = e[~np.isnan(e)]
+        out.append(mean[i] + np.quantile(e if len(e) >= 5 else pooled, q))   # too few: fall back to all hours
+    return np.round(np.clip(out, 0, None), 1)
 
 
 def walk_forward(y, exog=None, models=None, h=C.HORIZON, folds=C.N_FOLDS, first_origin=None, model_kw=None,

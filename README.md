@@ -12,7 +12,7 @@ buoy audio ─► windows + 50–250 Hz band-pass ─► up-call detector (MiniR
           ─► Naive · Seasonal naive · Holt-Winters · SARIMA · SARIMAX(SST)
           ─► walk-forward validation (5 × 72 h) · MAE · RMSE · MASE · empirical 80 % intervals from past errors · no future SST
           ─► residual checks: Ljung-Box (24, 48) · Jarque-Bera · residual ACF · Q-Q
-          ─► risk from upper 80 % bound (5 / 3.5 real calls/h) · alert windows · CUSUM ─► dashboard
+          ─► risk from hour-of-day risk bound (5 / 3.5 real calls/h) · alert windows · CUSUM ─► dashboard
 ```
 
 ## Setup (Windows)
@@ -31,7 +31,7 @@ pip install -r requirements.txt
 ```bat
 python run_all.py            :: full pipeline, about 2 minutes
 streamlit run app.py         :: opens the dashboard in your browser
-python -m pytest -q          :: 15 checks
+python -m pytest -q          :: 17 checks
 ```
 
 Faster run without the audio stage: `python run_all.py --skip-detector`.

@@ -27,7 +27,7 @@ def nums(a, nd=3):
 
 def forecast_block(df):
     return {"t": [str(t)[:16] for t in df.timestamp], "actual": nums(df.actual), "forecast": nums(df.forecast),
-            "lo": nums(df.lo80), "hi": nums(df.hi80)}
+            "lo": nums(df.lo80), "hi": nums(df.hi80), "rb": nums(df.risk_bound)}
 
 
 def main():
@@ -54,7 +54,7 @@ def main():
                  "cusum": {"sigma": round(s["risk"]["cusum_sigma"], 3), "k": C.CUSUM_K, "h": C.CUSUM_H,
                            "alarm": s["risk"]["cusum_alarm_hour"]},
                  "recall": rates[0], "precision": rates[1], "source_name": src.get("name"), "source_note": src.get("note"),
-                 "horizon": C.HORIZON, "folds": s.get("folds", C.N_FOLDS), "n_cal": C.N_CAL, "band": list(C.BAND)},
+                 "horizon": C.HORIZON, "risk_q": C.RISK_QUANTILE, "folds": s.get("folds", C.N_FOLDS), "n_cal": C.N_CAL, "band": list(C.BAND)},
         "hourly": {"t0": str(h.timestamp.iloc[0])[:16], "calls": nums(h.calls, 1),
                    "calls_true": nums(h.calls_true, 1) if "calls_true" in h else None,
                    "sst_daily": nums(sst_daily, 2)},
