@@ -119,8 +119,10 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   (https://bhargav1130.github.io/TSAF_Echogaurd/; needs Settings > Pages > Source: GitHub Actions).
   The Claude Artifact copy still needs a manual republish (version 10 = 27 Nov full check).
   GitHub cron had not fired once 5 h after setup, so the workflow also runs on every push to main and has a
-  `next` job (backup clock): each non-schedule run sleeps to :23 of the next hour and dispatches the next run;
-  it stops once real scheduled runs appear, and only the oldest chain survives (no duplicates). With --skip-detector, run_all now reads
+  `next` job (backup clock): every run (schedule included) sleeps to :45 of the next hour (>= 40 min) and dispatches
+  a run unless a newer run exists (that one owns the chain; no duplicates). Cron fired once (23:34 UTC 27 Nov) and the
+  old rule ("stop once a scheduled run appears") then left 6 h with no runs; fixed 28 Nov. `concurrency` is on the
+  fetch job, so a sleeping `next` job no longer blocks new runs. With --skip-detector, run_all now reads
   outputs/detector_metrics.csv (kept in git, has a source column) so the detector section is filled.
 
 ## Verified results — REAL Cape Cod Bay 2019 (main results until 27 Nov 2026)
