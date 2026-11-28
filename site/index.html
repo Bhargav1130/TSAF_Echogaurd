@@ -72,6 +72,8 @@ section { padding: 88px 0; border-bottom: 1px solid var(--rule) }
 .readout { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px }
 .chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--rule); background: var(--surface); border-radius: 999px; padding: 9px 14px; font: 500 .76rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .06em }
 .dot { width: 9px; height: 9px; border-radius: 50% }
+.refresh { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 12px; max-width: 460px; font-size: .8rem; color: var(--muted) }
+.refresh a.btn { text-decoration: none; display: inline-block }
 .risk-now { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; align-items: center; margin-top: 22px; padding: 16px 18px; border-radius: var(--r); border: 1px solid var(--rule); background: var(--surface); max-width: 460px }
 .risk-badge { grid-row: span 2; font: 800 2.4rem/1 var(--f-display); letter-spacing: .03em; color: #fff; padding: 12px 16px; border-radius: 4px }
 #waterfall { width: 100%; height: clamp(260px, 34vw, 380px); display: block }
@@ -159,6 +161,7 @@ footer { padding-block: 48px 64px }
     <h1>Echo<span>Guard</span></h1>
     <p class="lede">Hydrophone buoys hear North Atlantic right whales calling. EchoGuard counts those up-calls hour by hour, forecasts the next 72 hours and turns the forecast into a LOW / MEDIUM / HIGH warning for ships.</p>
     <div class="risk-now" id="riskNow"></div>
+    <div class="refresh" id="refreshBar"><span class="mono" id="refreshInfo"></span><span id="refreshCtl"></span></div>
     <div class="readout" id="heroChips"></div>
     <p class="note mono">Time Series Analysis and Forecasting (CS3216) · RV University</p>
   </div>
@@ -423,6 +426,33 @@ function heroRisk() {
   $("#heroChips").innerHTML = ch.map(([t, c]) => `<span class="chip"><span class="dot" style="background:var(${c})"></span>${t}</span>`).join("");
 }
 heroRisk();
+
+/* ---------------- refresh: load the newest hourly forecast ---------------- */
+(() => {
+  // The page is rebuilt every hour on GitHub Pages; the data is baked in, so "refresh" = load the newest build.
+  const LIVE = "https://bhargav1130.github.io/TSAF_Echogaurd/", first = D.live.t[0];
+  const info = $("#refreshInfo"), ctl = $("#refreshCtl"), onPages = location.hostname.endsWith("github.io");
+  info.textContent = M.simulated ? "Simulated data: no live updates." : `Forecast from ${first} UTC · new data every hour`;
+  if (M.simulated) return;
+  if (!onPages) { ctl.innerHTML = `<a class="btn" href="${LIVE}" target="_blank" rel="noopener">Open live site ↗</a>`; return; }
+  ctl.innerHTML = `<button class="btn" id="refreshBtn">Refresh</button> <span id="refreshMsg" role="status"></span>`;
+  const btn = $("#refreshBtn"), msg = $("#refreshMsg");
+  async function newest() {           // first forecast hour of the newest published build (bypasses the browser cache)
+    const html = await (await fetch(location.pathname + "?t=" + Date.now(), { cache: "no-store" })).text();
+    return (html.match(/"live":\{"t":\["([^"]+)"/) || [])[1];
+  }
+  const reload = () => location.replace(location.pathname + "?t=" + Date.now() + location.hash);
+  btn.onclick = async () => {
+    btn.disabled = true; msg.textContent = "checking…";
+    try { const n = await newest();
+      if (n && n > first) { msg.textContent = "new forecast, loading…"; reload(); }
+      else msg.textContent = `up to date · checked ${new Date().toUTCString().slice(17, 22)} UTC`;
+    } catch (e) { msg.textContent = "could not reach the site, try again"; }
+    btn.disabled = false; };
+  setInterval(async () => {           // every 5 min: flag a newer build on the button, without reloading by itself
+    try { const n = await newest(); if (n && n > first) { btn.textContent = "New forecast · Refresh"; btn.setAttribute("aria-pressed", "true"); } } catch (e) {}
+  }, 5 * 60e3);
+})();
 
 /* ---------------- hero: live waterfall spectrogram ---------------- */
 (() => {

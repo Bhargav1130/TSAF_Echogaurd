@@ -50,6 +50,9 @@ high_t = st.sidebar.slider("HIGH if risk bound ≥ (calls/h)", 0.5, 15.0, round(
 med_t = st.sidebar.slider("MEDIUM if risk bound ≥ (calls/h)", 0.1, high_t, min(round(float(th[1]), 1), high_t), 0.1,
                           help=f"Default = {C.MEDIUM_THRESHOLD} real calls/h, converted to detector counts when the series is detector output")
 gap = st.sidebar.slider("Join HIGH windows separated by ≤ (hours)", 0, 3, 1)
+if st.sidebar.button("Reload results", help="Re-read outputs/ after `git pull` and `python run_all.py ...` have produced new results"):
+    st.cache_data.clear()
+    st.rerun()
 st.sidebar.markdown("---")
 loc = summary.get("location")
 st.sidebar.caption(f"Data: {summary['data_source']}")
