@@ -50,7 +50,9 @@ a { color: var(--accent) }
 .nav nav a { font: 500 .72rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); text-decoration: none; white-space: nowrap }
 .nav nav a:hover { color: var(--ink) }
 
-section { padding-block: clamp(48px, 8vw, 88px); border-bottom: 1px solid var(--rule) }
+section { padding: 88px 0; border-bottom: 1px solid var(--rule) }
+@media (max-width: 1100px) { section { padding: 68px 0 } }
+@media (max-width: 640px) { section { padding: 48px 0 } }
 .sec-head { display: grid; gap: 12px; margin-bottom: 28px }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 24px; align-items: start }
 .grid2 > * { min-width: 0 }
