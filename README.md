@@ -31,7 +31,7 @@ pip install -r requirements.txt
 ```bat
 python run_all.py            :: full pipeline, about 2 minutes
 streamlit run app.py         :: opens the dashboard in your browser
-python -m pytest -q          :: 20 checks
+python -m pytest -q          :: 21 checks
 ```
 
 Faster run without the audio stage: `python run_all.py --skip-detector`.
@@ -71,7 +71,7 @@ If your network cannot reach whoi.edu, let a cloud machine fetch it:
 | `alerts.csv` | merged HIGH-risk windows |
 | `figures/*.png` | daily calls vs SST, hourly profile, ACF, STL, MASE, forecast, risk strip, residual diagnostics, PR curves |
 
-## Current results (27 Nov 2026)
+## Current results (28 Nov 2026)
 
 Use these numbers when updating the report and paper. 80 % coverage = share of actual hours inside the 80 % band
 (target 0.80). Risk = LOW / MEDIUM / HIGH from the risk bound (75 % quantile of forecast + past errors at the same
@@ -79,14 +79,19 @@ hour of day), thresholds 5 / 3.5 real calls/h.
 
 | Data | Best model | MAE | MASE | 80 % coverage | Risk check |
 |---|---|---|---|---|---|
-| **Live** WHOI Cape Cod Bay buoy, 29 Sep - 27 Nov 2026 12:00 UTC, 5 folds | SARIMA(2,0,2) | 6.97 | 2.15 | 87 % | last fold LOW 24 / MEDIUM 6 / HIGH 42 h; all 12 hours with >= 5 calls flagged |
-| **Real** Cape Cod Bay 2019 (DCLDE), 28 folds | SARIMAX with SST | 24.55 | 0.60 | 85 % | over all 28 folds: 75 % of HIGH hours were busy, 98 % of busy hours caught |
-| **Simulated** 60-day season through MiniRocket (illustration only) | Holt-Winters | 1.01 | 1.22 | 88 % | last fold LOW 54 / MEDIUM 6 / HIGH 12 h |
+| **Live** WHOI Cape Cod Bay buoy, 30 Sep - 28 Nov 2026 04:00 UTC, 5 folds | SARIMA(2,0,1)(1,0,1)24 | 8.00 | 2.34 | 91 % | last fold LOW 30 / HIGH 42 h; all 9 hours with >= 5 calls flagged; HIGH precision 0.21 (base rate 0.12) |
+| **Real** Cape Cod Bay 2019 (DCLDE), 28 folds | SARIMAX with SST | 24.55 | 0.60 | 88 % | over all 28 folds: 75 % of HIGH hours were busy, 98 % of busy hours caught |
+| **Simulated** 60-day season through the Kaggle-trained MiniRocket (illustration only) | Holt-Winters | 0.93 | 1.32 | 91 % | last fold LOW 48 / MEDIUM 12 / HIGH 12 h |
 
 Detectors on 5000 real Kaggle clips: MiniRocket PR-AUC 0.76 (precision 0.75, recall 0.52), MFCC + logistic
 regression 0.60, energy threshold 0.26. On the bursty live data an hourly forecast 72 h ahead is only modestly
-better than the average daily pattern (about 39 % of HIGH hours busy against a 29 % base rate); the naive baseline (MAE 6.62)
-is as good as the fitted models there, and the live numbers change every hour. On the 2019 season, with a strong daily cycle and steady presence, it works well (MASE 0.60).
+better than the average daily pattern (HIGH hours are busy about twice as often as the base rate, but most are
+not busy), and the live numbers change every hour as the 60-day window moves. On the 2019 season, with a strong
+daily cycle and steady presence, it works well (MASE 0.60).
+
+The 80 % band is slightly wide (88-91 % instead of 80 %) on purpose: its lower bound may not exceed the 10 %
+quantile of recently observed calls. Without that rule one busy hour just before the forecast lifted the whole band
+off zero and coverage fell to 18 % in a live fold (average 46-86 % depending on model and data).
 
 ## Data
 

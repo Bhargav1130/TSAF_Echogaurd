@@ -156,7 +156,14 @@ def empirical_interval(run, y, s, h=C.HORIZON, n_cal=C.N_CAL, alpha=C.INTERVAL_A
     # zero-call hour outside the band, and 57% of live hours are zero (coverage fell to 41-47%).
     # Upper bound to the NEAREST call: ceil over-covered small counts. Tested over live, simulated and
     # 2019 folds: floor/round 87 / 88 / 85% (worst fold 72%), round/round 71% (worst 46%), floor/ceil 88 / 93 / 85%.
-    r.update(lo=np.floor(np.clip(r["mean"] + q_lo, 0, None)), hi=np.round(r["mean"] + q_hi),
+    # Errors are added as if they did not depend on the forecast level, which fails on bursty counts: one busy
+    # hour before the origin lifts a Naive/Holt-Winters forecast to 4, past errors (made at level 0-1) say
+    # "-1 at most", and the lower bound 3 excludes every zero hour (28 Nov live fold: 18% coverage). So the lower
+    # bound may not exceed the alpha/2 quantile of the calls actually seen in the calibration windows.
+    # Over live and 2019 folds: average coverage 46-86% -> 89-92%, worst fold 1-57% -> 60-75%.
+    act = np.concatenate([y[c:c + h] for c in cal]); act = act[~np.isnan(act)]
+    lo = np.minimum(np.floor(np.clip(r["mean"] + q_lo, 0, None)), np.floor(np.quantile(act, alpha / 2)))
+    r.update(lo=lo, hi=np.round(r["mean"] + q_hi),
              err_sd=float(errs.std()), n_cal=len(cal),
              risk=risk_bound(r["mean"], y, run, cal, h))
     return r

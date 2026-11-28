@@ -234,3 +234,13 @@ def test_whoi_refresh_never_loses_hours(tmp_path):
     assert list(h.index) == list(idx) and h.calls.tolist() == [0.0, 4.0, 1.0, 0.0, 3.0]   # new values win
     assert "sst_c" not in h                                                        # SST is added afterwards
     assert fetch_whoi.keep_newer_hours(short, tmp_path / "none.csv") is short
+
+
+def test_band_keeps_zero_after_a_burst_at_the_origin():
+    # quiet, zero-heavy history, then one busy hour right before the origin: a level forecast jumps to it,
+    # but the lower bound must stay at 0 because most recent hours really were 0
+    y = np.zeros(1500); y[np.arange(30, 1500, 7)] = 2.0; y[1439] = 9.0
+    def run(s):
+        return {"mean": np.full(72, y[s - 1]), "lo": None, "hi": None, "resid": None}
+    r = forecast.empirical_interval(run, y, 1440)
+    assert r["mean"][0] == 9.0 and (r["lo"] == 0).all()
