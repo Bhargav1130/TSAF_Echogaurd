@@ -51,7 +51,11 @@ med_t = st.sidebar.slider("MEDIUM if risk bound ≥ (calls/h)", 0.1, high_t, min
                           help=f"Default = {C.MEDIUM_THRESHOLD} real calls/h, converted to detector counts when the series is detector output")
 gap = st.sidebar.slider("Join HIGH windows separated by ≤ (hours)", 0, 3, 1)
 st.sidebar.markdown("---")
+loc = summary.get("location")
 st.sidebar.caption(f"Data: {summary['data_source']}")
+if loc:
+    st.sidebar.caption(f"Where: {loc['place']} · {loc['station']} · {loc['lat']:.3f}, {loc['lon']:.3f}"
+                       f"{' (approx.)' if loc['approx'] else ''} · forecast covers ≈ {loc['radius_km']} km around it")
 st.sidebar.caption(f"Model: {summary['dashboard_model']}")
 
 fc = fc.copy()
@@ -121,7 +125,29 @@ with right:
 
 # ---------------------------------------------------------------- details
 st.markdown("---")
-tab1, tab2, tab3 = st.tabs(["Time series analysis", "Model comparison", "Up-call detector"])
+tab0, tab1, tab2, tab3 = st.tabs(["Where", "Time series analysis", "Model comparison", "Up-call detector"])
+with tab0:
+    if not loc:
+        st.write("Simulated season: there is no real buoy position. Run with real data (fetch_whoi.py or fetch_dclde.py).")
+    else:
+        import pydeck as pdk
+        st.markdown(f"**{loc['place']}** — {loc['station']}. The forecast is for right whales calling within hearing "
+                    f"range of this recorder, about {loc['radius_km']} km around it (assumed; 10–20 km depending on noise). "
+                    "One recorder cannot say where inside the circle a whale is, only whether whales are there.")
+        rec = pd.DataFrame([{"lat": a, "lon": b, "used": abs(a - loc["lat"]) < 1e-4 and abs(b - loc["lon"]) < 1e-4}
+                            for a, b in loc.get("recorders", [[loc["lat"], loc["lon"]]])])
+        rec["color"] = rec.used.map({True: [201, 116, 20, 230], False: [86, 106, 115, 200]})
+        st.pydeck_chart(pdk.Deck(
+            initial_view_state=pdk.ViewState(latitude=loc["lat"], longitude=loc["lon"], zoom=8.6),
+            layers=[pdk.Layer("ScatterplotLayer", data=pd.DataFrame([loc]), get_position="[lon, lat]",
+                              get_radius=loc["radius_km"] * 1000, get_fill_color=[13, 107, 136, 40],
+                              get_line_color=[13, 107, 136, 200], stroked=True, line_width_min_pixels=1),
+                    pdk.Layer("ScatterplotLayer", data=rec, get_position="[lon, lat]", get_radius=700,
+                              get_fill_color="color", pickable=True)],
+            tooltip={"text": "{lat}, {lon}"}))
+        if loc["approx"]:
+            st.caption("WHOI does not publish the exact mooring position on the buoy page; the marker is the position "
+                       "EchoGuard uses for sea temperature.")
 an = summary["analysis"]
 with tab1:
     s = an["stationarity"]

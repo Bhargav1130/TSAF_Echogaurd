@@ -123,8 +123,13 @@ def get_sst(start, lat, lon, previous_csv):
             "kept from the previous download (NOAA ERDDAP was unavailable)")
 
 
-def source_note(platform, h, sst_source="NOAA MUR SST v4.1 via ERDDAP"):
+def source_note(platform, h, sst_source="NOAA MUR SST v4.1 via ERDDAP", lat=41.95, lon=-70.30):
+    cape_cod = platform.startswith("maccb")
     return {"name": "WHOI Robots4Whales live buoy detections",
+            # WHOI does not publish the mooring position on the buoy page: lat/lon is the --lat/--lon point (approximate)
+            "location": {"place": "Cape Cod Bay, Massachusetts, USA (North Atlantic)" if cape_cod else "see --platform",
+                         "station": f"WHOI buoy {platform.split('/')[0]}", "lat": lat, "lon": lon, "approx": True,
+                         "recorders": [[lat, lon]]},
             "note": (f"Real right whale up-calls from the WHOI near real-time buoy {platform.split('/')[0]} "
                      f"(Cape Cod Bay by default), {h.index[0]:%d %b} - {h.index[-1]:%d %b %Y %H:%M} UTC, "
                      "counted every 15 minutes by the buoy's automatic detector (Baumgartner lab, WHOI; many periods "
@@ -160,7 +165,7 @@ def main():
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     h.to_csv(args.out, index_label="timestamp")
     # plain-language source note read by site/build_site.py
-    Path(args.out).with_suffix(".source.json").write_text(json.dumps(source_note(args.platform, h, sst_source), indent=1),
+    Path(args.out).with_suffix(".source.json").write_text(json.dumps(source_note(args.platform, h, sst_source, args.lat, args.lon), indent=1),
                                                           encoding="utf-8")
     print(f"Wrote {args.out}  ({h.index[0]:%Y-%m-%d %H:%M} to {h.index[-1]:%Y-%m-%d %H:%M} UTC)")
     print(f"Next:  python run_all.py --skip-detector --hourly-csv {args.out}")

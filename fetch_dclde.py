@@ -100,6 +100,9 @@ def main():
     # plain-language source note read by site/build_site.py
     Path(args.out).with_suffix(".source.json").write_text(json.dumps({
         "name": "NOAA DCLDE 2027 Cape Cod Bay right whale detections",
+        "location": {"place": "Cape Cod Bay, Massachusetts, USA (North Atlantic)",
+                     "station": f"seafloor recorder {args.channel} of 5", "lat": CHANNELS[args.channel][0],
+                     "lon": CHANNELS[args.channel][1], "approx": False, "recorders": list(CHANNELS.values())},
         "note": (f"Real right whale up-calls recorded in Cape Cod Bay, Massachusetts, {h.index[0]:%d %b} - "
                  f"{h.index[-1]:%d %b %Y}, from one of five seafloor recorders (Garcia & Tolkova et al. 2025, "
                  "NOAA NCEI passive acoustic archive). Counts come from the dataset's own automated up-call detector "

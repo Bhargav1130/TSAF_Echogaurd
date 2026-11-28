@@ -142,7 +142,7 @@ footer { padding-block: 48px 64px }
 <header class="nav"><div class="wrap">
   <a class="brand" href="#top">EchoGuard</a>
   <nav aria-label="Sections">
-    <a href="#pipeline">Pipeline</a><a href="#detector">Detector</a><a href="#season">Season</a>
+    <a href="#pipeline">Pipeline</a><a href="#detector">Detector</a><a href="#where">Where</a><a href="#season">Season</a>
     <a href="#analysis">Analysis</a><a href="#models">Models</a><a href="#forecast">Forecast</a><a href="#diagnostics">Diagnostics</a>
   </nav>
 </div></header>
@@ -206,6 +206,18 @@ footer { padding-block: 48px 64px }
       <svg id="detChart" class="chart" height="190"></svg>
       <p class="note">The threshold is set on validation clips so that at least 80% of detections are real calls; precision and recall are then measured on unseen test clips.</p>
     </div>
+  </div>
+</div></section>
+
+<section id="where"><div class="wrap">
+  <div class="sec-head">
+    <div class="eyebrow">Where the buoy listens</div>
+    <h2 id="whereTitle">One buoy, one listening circle</h2>
+    <p class="muted" id="whereLede"></p>
+  </div>
+  <div class="grid2">
+    <svg id="whereMap" class="chart" height="420" role="img" aria-label="Map of the recorder position and its listening area"></svg>
+    <div><div class="stats" id="whereStats"></div><p class="note" id="whereNote"></p></div>
   </div>
 </div></section>
 
@@ -401,6 +413,7 @@ function heroRisk() {
   const ch = [[M.simulated ? "Simulated season" : "Real buoy data", M.simulated ? "--med" : "--low"],
     [M.simulated ? `Detector trained on ${M.detector_source.replace(" Whale Detection Challenge", "")} clips` : (M.source_name || "Real detections"), "--accent"],
     [`${M.model} · ${M.horizon} h ahead`, "--accent"]];
+  if (D.location) ch.splice(1, 0, [D.location.place.split(",")[0], "--call"]);
   $("#heroChips").innerHTML = ch.map(([t, c]) => `<span class="chip"><span class="dot" style="background:var(${c})"></span>${t}</span>`).join("");
 }
 heroRisk();
@@ -556,6 +569,45 @@ heroRisk();
     svg.selectAll(".val").data(data).join("text").attr("class", "val").attr("y", d => y(d.detector) + y.bandwidth() / 2 + 4).style("fill", css("--ink"))
       .text(d => f(d[key], 3)).transition().duration(DUR).attr("x", d => x(d[key]) + 6); }
   seg($("#detSeg"), k => { key = k; draw(); }); reg(draw);
+})();
+
+/* ---------------- where: recorder position and listening area ---------------- */
+(() => {
+  const L = D.location, el = $("#whereMap");
+  if (!L) { $("#whereTitle").textContent = "No real place";
+    $("#whereLede").textContent = "This run uses a simulated season, so there is no real buoy position. Run with real data (fetch_whoi.py or fetch_dclde.py) to see where the calls were recorded.";
+    el.style.display = "none"; return; }
+  const ll = `${Math.abs(L.lat).toFixed(3)}° ${L.lat >= 0 ? "N" : "S"}, ${Math.abs(L.lon).toFixed(3)}° ${L.lon >= 0 ? "E" : "W"}`;
+  $("#whereLede").textContent = `${L.place}. The forecast is for right whales calling within hearing range of ${L.station}, ` +
+    `about ${L.radius_km} km around it. One recorder cannot say where inside that circle a whale is: it says whether whales are there.`;
+  $("#whereStats").innerHTML = [[L.place.split(",")[0], "area"], [ll + (L.approx ? " (approx.)" : ""), L.station],
+    [`≈ ${L.radius_km} km`, "listening radius (assumed)"]].map(([v, k]) => `<div class="stat"><div class="v" style="font-size:1rem">${v}</div><div class="k">${k}</div></div>`).join("");
+  $("#whereNote").textContent = (L.approx ? "WHOI does not publish the exact mooring position on the buoy page; the marker is the position EchoGuard uses for sea temperature. " : "") +
+    "A buoy hears up-calls roughly 10–20 km away depending on background noise and sea state, so the circle is a guide, not a boundary. " +
+    "Ships crossing this circle while risk is HIGH should slow down and keep watch." + (D.coast ? " Coastline © OpenStreetMap contributors (ODbL)." : "");
+  function draw() { const w = W(el), h = 420, svg = d3.select(el).attr("viewBox", `0 0 ${w} ${h}`); svg.selectAll("*").remove();
+    const circle = d3.geoCircle().center([L.lon, L.lat]).radius(L.radius_km / 111.2)();
+    const frame = D.coast ? { type: "Feature", geometry: { type: "Polygon", coordinates: [[[D.coast.bbox[0], D.coast.bbox[1]], [D.coast.bbox[0], D.coast.bbox[3]],
+      [D.coast.bbox[2], D.coast.bbox[3]], [D.coast.bbox[2], D.coast.bbox[1]], [D.coast.bbox[0], D.coast.bbox[1]]]] } } : circle;
+    const pr = d3.geoMercator().fitExtent([[10, 10], [w - 10, h - 10]], frame), path = d3.geoPath(pr);
+    svg.append("rect").attr("width", w).attr("height", h).attr("fill", css("--surface")).attr("rx", 6);
+    if (D.coast) svg.append("path").datum({ type: "MultiLineString", coordinates: D.coast.lines }).attr("d", path)
+      .attr("fill", "none").attr("stroke", css("--muted")).attr("stroke-width", 1.1).attr("stroke-linejoin", "round");
+    svg.append("path").datum(circle).attr("d", path).attr("fill", css("--accent")).attr("fill-opacity", .14).attr("stroke", css("--accent")).attr("stroke-dasharray", "5 4");
+    (L.recorders || []).forEach(([la, lo]) => { const [x, y] = pr([lo, la]), used = Math.abs(la - L.lat) < 1e-4 && Math.abs(lo - L.lon) < 1e-4;
+      svg.append("circle").attr("cx", x).attr("cy", y).attr("r", used ? 6 : 3.5).attr("fill", used ? css("--call") : css("--muted"))
+        .attr("stroke", css("--surface")).attr("stroke-width", 1.5)
+        .on("mousemove", e => showTip(e, `${used ? L.station : "other recorder (not used)"}<br>${la.toFixed(3)}°, ${lo.toFixed(3)}°`)).on("mouseleave", hideTip); });
+    const lab = (lo, la, t, c = "--muted", s = ".72rem") => { const [x, y] = pr([lo, la]);
+      if (x > 30 && x < w - 30) svg.append("text").attr("x", x).attr("y", y).attr("text-anchor", "middle").attr("fill", css(c)).style("font", `500 ${s} var(--f-mono)`).text(t); };
+    if (D.coast) { lab(-70.667, 41.985, "Plymouth"); lab(-70.19, 42.075, "Provincetown"); lab(-70.30, 41.70, "CAPE COD"); lab(-70.44, 41.80, "CAPE COD BAY", "--accent"); }
+    const [bx, by] = pr([L.lon, L.lat]);
+    svg.append("text").attr("x", bx + 10).attr("y", by - 9).attr("fill", css("--ink")).style("font", "600 .74rem var(--f-mono)").text(L.station.replace("WHOI buoy ", "buoy "));
+    const km = pr([L.lon + 10 / (111.2 * Math.cos(L.lat * Math.PI / 180)), L.lat])[0] - bx;   // 10 km scale bar
+    svg.append("path").attr("d", `M${w - 24 - km},${h - 22}h${km}`).attr("stroke", css("--ink")).attr("stroke-width", 2);
+    svg.append("text").attr("x", w - 24 - km / 2).attr("y", h - 28).attr("text-anchor", "middle").attr("fill", css("--ink")).style("font", ".7rem var(--f-mono)").text("10 km");
+    svg.append("text").attr("x", 18).attr("y", 26).attr("fill", css("--ink")).style("font", "600 .8rem var(--f-mono)").text("N ↑"); }
+  reg(draw);
 })();
 
 /* ---------------- season chart with brush ---------------- */

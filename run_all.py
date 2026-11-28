@@ -8,6 +8,7 @@
 import argparse
 import json
 import time
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -233,6 +234,13 @@ def run_risk(h, y, fc, best, s, sigma, rates=(1.0, 1.0)):
             "issued": str(fc.timestamp.iloc[0])}
 
 
+def location(hourly_csv):
+    """Where the data was recorded (from the fetch script's .source.json sidecar); None for simulated data."""
+    side = Path(hourly_csv).with_suffix(".source.json") if hourly_csv else None
+    loc = json.loads(side.read_text(encoding="utf-8")).get("location") if side and side.exists() else None
+    return {**loc, "radius_km": C.LISTEN_RADIUS_KM} if loc else None
+
+
 def main():
     ap = argparse.ArgumentParser(description="EchoGuard pipeline")
     ap.add_argument("--hourly-csv", help="real hourly series (timestamp, calls[, sst_c])")
@@ -255,7 +263,8 @@ def main():
            "models": summary.round(3).replace({np.nan: None}).to_dict(orient="records"),
            "dashboard_model": best, "ljung_box_p_lag24": lb, "last_fold_inside_80": inside, "risk": rk,
            "detector_rates": list(rates),
-           "folds": int(pd.read_csv(C.OUT_DIR / "model_metrics_per_fold.csv").fold.max())}
+           "folds": int(pd.read_csv(C.OUT_DIR / "model_metrics_per_fold.csv").fold.max()),
+           "location": location(args.hourly_csv)}
     with open(C.OUT_DIR / "summary.json", "w") as f:
         json.dump(out, f, indent=2, default=str)
     print(f"\nDone in {time.time() - t0:.0f}s. Results are in {C.OUT_DIR}")

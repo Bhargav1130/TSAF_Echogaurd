@@ -68,7 +68,13 @@ def main():
         "backtest": {**forecast_block(bt), "origin": int(np.searchsorted(h.timestamp, bt.timestamp.iloc[0]))},
         "live": {**forecast_block(live), "origin": len(h)},
         "resid": {k: v for k, v in s["residual_diagnostics"].items() if k != "acf_outside_band"},
+        "location": s.get("location"),
     }
+    loc = s.get("location")
+    coast = json.loads((ROOT / "site" / "coast_ccb.json").read_text())
+    bb = coast["bbox"]
+    if loc and bb[0] <= loc["lon"] <= bb[2] and bb[1] <= loc["lat"] <= bb[3]:   # coastline only covers Cape Cod Bay
+        data["coast"] = coast
     data["resid"]["acf"] = nums(data["resid"]["acf"], 3)
     aic = pd.read_csv(OUT / "sarima_aic.csv")                      # model like "SARIMA(1, 0, 1)(1, 0, 1, 24)"
     o = aic.model.str.extractall(r"(\d+)").unstack().astype(int)   # p, d, q, P, D, Q, s

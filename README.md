@@ -31,7 +31,7 @@ pip install -r requirements.txt
 ```bat
 python run_all.py            :: full pipeline, about 2 minutes
 streamlit run app.py         :: opens the dashboard in your browser
-python -m pytest -q          :: 18 checks
+python -m pytest -q          :: 19 checks
 ```
 
 Faster run without the audio stage: `python run_all.py --skip-detector`.
@@ -93,6 +93,12 @@ is as good as the fitted models there, and the live numbers change every hour. O
 With no data supplied, everything runs on a **simulated** buoy season and
 simulated clips, so the numbers illustrate the method. See `data/README.md` to
 plug in the real Kaggle clips and buoy series.
+
+**Where.** The real data comes from Cape Cod Bay, Massachusetts (North Atlantic): the live WHOI buoy `maccb2606`
+(about 41.95 N, 70.30 W; WHOI does not publish the exact mooring position) and, for 2019, seafloor recorder 1 of 5
+(41.934 N, 70.229 W). A forecast covers right whales calling within hearing range of that one recorder, about 15 km
+(assumed; 10-20 km depending on noise). It says whether whales are there, not where inside the circle. The website
+("Where" section) and the dashboard ("Where" tab) show the map.
 
 ## Project layout
 

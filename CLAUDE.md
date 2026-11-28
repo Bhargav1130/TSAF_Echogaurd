@@ -27,7 +27,7 @@ pip install -r requirements.txt
 python run_all.py              :: full pipeline, ~2 min (incl. ~35 s AIC grid), writes outputs/
 python run_all.py --skip-detector
 streamlit run app.py           :: dashboard
-python -m pytest -q            :: 18 tests
+python -m pytest -q            :: 19 tests
 python fetch_whoi.py           :: real near real-time WHOI buoy data -> data/buoy_hourly.csv
 ```
 Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
@@ -73,7 +73,11 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   standardised by err_sd (std of past 72-h forecast errors), not by the raw series std. Advice text.
   A threshold relative to the recent mean was tried and rejected: it rises in busy periods and hides alerts.
 - `plots.py`, `run_all.py` (orchestrates 5 stages, writes outputs/*.csv, summary.json, figures/), `app.py` (Streamlit;
-  `full_width()` helper; slider defaults come from summary.json risk.thresholds), `tests/test_echoguard.py` (18).
+  `full_width()` helper; slider defaults come from summary.json risk.thresholds), `tests/test_echoguard.py` (19).
+- Location: fetch_whoi.py / fetch_dclde.py write "location" (place, station, lat, lon, approx, recorders) into the
+  .source.json sidecar; run_all.location() copies it into summary.json with radius_km = C.LISTEN_RADIUS_KM (15 km,
+  assumed hearing range). Site "Where" section (D3 map, OSM coastline in site/coast_ccb.json, ODbL) and app "Where"
+  tab (pydeck). WHOI buoy position 41.95 N 70.30 W is approximate (not published on the buoy page). Simulated: no place.
 - `site/` – interactive showcase website. `template.html` (page + D3 7.8.5 from cdnjs with SRI) and
   `build_site.py`, which injects outputs/ data and writes `echoguard.html` (Artifact body, published at
   https://claude.ai/artifact/C775C6y5j4wpnjGLhD6shn — republish that file to keep the URL) and `index.html`

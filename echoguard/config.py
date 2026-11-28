@@ -32,6 +32,9 @@ MEDIUM_THRESHOLD = 3.5      # risk bound >= this -> MEDIUM
 # risk bound = this quantile of (forecast + past 72-h errors at the same hour of day):
 # HIGH means at least a 1 - 0.75 = 25 % chance of reaching the HIGH threshold
 RISK_QUANTILE = 0.75
+# A buoy hears right whale up-calls roughly 10-20 km away (depends on noise and sea state); the forecast
+# covers this circle around the recorder, not a whale's exact position. Assumed value for the map.
+LISTEN_RADIUS_KM = 15
 CUSUM_K = 0.5               # CUSUM slack (in units of the std of past 72-h forecast errors)
 CUSUM_H = 4.0               # CUSUM alarm level
 

@@ -207,3 +207,17 @@ def test_band_keeps_zero_hours_on_zero_heavy_counts():
     r = forecast.empirical_interval(run, y, 1500)
     assert (r["lo"] == 0).all()                                    # zero-call hours stay inside the band
     assert np.mean((y[1500:1572] >= r["lo"]) & (y[1500:1572] <= r["hi"])) >= 0.7
+
+
+def test_location_travels_from_source_note_to_summary(tmp_path):
+    import json
+    import fetch_whoi
+    import run_all
+    h = pd.DataFrame({"calls": [0.0, 2.0]}, index=pd.date_range("2026-11-01", periods=2, freq="h", tz="UTC"))
+    note = fetch_whoi.source_note("maccb2606/maccb2606_maccb", h, lat=41.95, lon=-70.30)
+    csv = tmp_path / "live.csv"
+    csv.with_suffix(".source.json").write_text(json.dumps(note))
+    loc = run_all.location(str(csv))
+    assert loc["place"].startswith("Cape Cod Bay") and loc["approx"] and loc["radius_km"] == C.LISTEN_RADIUS_KM
+    assert (loc["lat"], loc["lon"]) == (41.95, -70.30)
+    assert run_all.location(None) is None                          # simulated season: no place

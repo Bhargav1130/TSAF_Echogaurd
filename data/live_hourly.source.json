@@ -1,4 +1,17 @@
 {
  "name": "WHOI Robots4Whales live buoy detections",
+ "location": {
+  "place": "Cape Cod Bay, Massachusetts, USA (North Atlantic)",
+  "station": "WHOI buoy maccb2606",
+  "lat": 41.95,
+  "lon": -70.3,
+  "approx": true,
+  "recorders": [
+   [
+    41.95,
+    -70.3
+   ]
+  ]
+ },
  "note": "Real right whale up-calls from the WHOI near real-time buoy maccb2606 (Cape Cod Bay by default), 29 Sep - 28 Nov 2026 00:00 UTC, counted every 15 minutes by the buoy's automatic detector (Baumgartner lab, WHOI; many periods not yet analyst-reviewed) and refreshed hourly. Hours the buoy was not listening are missing, not zero. SST: NOAA MUR SST v4.1 via ERDDAP."
 }
