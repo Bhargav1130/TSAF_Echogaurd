@@ -123,6 +123,18 @@ def get_sst(start, lat, lon, previous_csv):
             "kept from the previous download (NOAA ERDDAP was unavailable)")
 
 
+def keep_newer_hours(h, previous_csv):
+    """WHOI sometimes serves a page that lacks its newest rows (seen 28 Nov 2026: 00:00 UTC -> 21:00 UTC between two
+    runs 4 min apart). Keep complete hours the previous file already had after the new end, so data never goes back."""
+    p = Path(previous_csv)
+    if not p.exists():
+        return h
+    prev = pd.read_csv(p)
+    prev.index = pd.to_datetime(prev.pop("timestamp"), utc=True)
+    tail = prev.loc[prev.index > h.index[-1], [c for c in h.columns if c in prev]]
+    return pd.concat([h, tail]) if len(tail) else h
+
+
 def source_note(platform, h, sst_source="NOAA MUR SST v4.1 via ERDDAP", lat=41.95, lon=-70.30):
     cape_cod = platform.startswith("maccb")
     return {"name": "WHOI Robots4Whales live buoy detections",
@@ -153,7 +165,7 @@ def main():
     except urllib.error.URLError as e:
         sys.exit(f"Cannot reach {BASE} ({e.reason}). Some networks block or cannot resolve whoi.edu: "
                  "try another network (college Wi-Fi, phone hotspot) or a VPN, then run again.")
-    h = to_hourly(tally)
+    h = keep_newer_hours(to_hourly(tally), args.out)
     print(f"{len(tally)} tally rows -> {len(h)} hours, {int(h.calls.isna().sum())} without listening, "
           f"{int(np.nansum(h.calls))} right whale calls")
 

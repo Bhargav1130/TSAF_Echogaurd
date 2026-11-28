@@ -221,3 +221,16 @@ def test_location_travels_from_source_note_to_summary(tmp_path):
     assert loc["place"].startswith("Cape Cod Bay") and loc["approx"] and loc["radius_km"] == C.LISTEN_RADIUS_KM
     assert (loc["lat"], loc["lon"]) == (41.95, -70.30)
     assert run_all.location(None) is None                          # simulated season: no place
+
+
+def test_whoi_refresh_never_loses_hours(tmp_path):
+    import fetch_whoi
+    idx = pd.date_range("2026-11-27 20:00", periods=5, freq="h", tz="UTC")        # previous file: to 00:00
+    old = pd.DataFrame({"calls": [0.0, 3.0, 1.0, 0.0, 3.0], "listen_s": 3600, "sst_c": 12.0}, index=idx)
+    f = tmp_path / "live.csv"
+    old.to_csv(f, index_label="timestamp")
+    short = pd.DataFrame({"calls": [0.0, 4.0], "listen_s": 3600}, index=idx[:2])  # new fetch stops at 21:00
+    h = fetch_whoi.keep_newer_hours(short, f)
+    assert list(h.index) == list(idx) and h.calls.tolist() == [0.0, 4.0, 1.0, 0.0, 3.0]   # new values win
+    assert "sst_c" not in h                                                        # SST is added afterwards
+    assert fetch_whoi.keep_newer_hours(short, tmp_path / "none.csv") is short

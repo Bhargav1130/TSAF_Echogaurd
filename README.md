@@ -31,7 +31,7 @@ pip install -r requirements.txt
 ```bat
 python run_all.py            :: full pipeline, about 2 minutes
 streamlit run app.py         :: opens the dashboard in your browser
-python -m pytest -q          :: 19 checks
+python -m pytest -q          :: 20 checks
 ```
 
 Faster run without the audio stage: `python run_all.py --skip-detector`.

@@ -27,7 +27,7 @@ pip install -r requirements.txt
 python run_all.py              :: full pipeline, ~2 min (incl. ~35 s AIC grid), writes outputs/
 python run_all.py --skip-detector
 streamlit run app.py           :: dashboard
-python -m pytest -q            :: 19 tests
+python -m pytest -q            :: 20 tests
 python fetch_whoi.py           :: real near real-time WHOI buoy data -> data/buoy_hourly.csv
 ```
 Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
@@ -73,7 +73,10 @@ Real data: `--hourly-csv data/buoy_hourly.csv` (timestamp, calls[, sst_c]) and
   standardised by err_sd (std of past 72-h forecast errors), not by the raw series std. Advice text.
   A threshold relative to the recent mean was tried and rejected: it rises in busy periods and hides alerts.
 - `plots.py`, `run_all.py` (orchestrates 5 stages, writes outputs/*.csv, summary.json, figures/), `app.py` (Streamlit;
-  `full_width()` helper; slider defaults come from summary.json risk.thresholds), `tests/test_echoguard.py` (19).
+  `full_width()` helper; slider defaults come from summary.json risk.thresholds), `tests/test_echoguard.py` (20). fetch_whoi.keep_newer_hours(): a refresh never drops complete hours the previous
+  live_hourly.csv had after the new end (28 Nov: WHOI served a page missing 3 newest hours, data went 00:00 -> 21:00 UTC).
+  Site refresh bar: on github.io a Refresh button loads the newest hourly build (checks every 5 min); elsewhere a link
+  to the live site. App sidebar "Reload results" clears the cache.
 - Location: fetch_whoi.py / fetch_dclde.py write "location" (place, station, lat, lon, approx, recorders) into the
   .source.json sidecar; run_all.location() copies it into summary.json with radius_km = C.LISTEN_RADIUS_KM (15 km,
   assumed hearing range). Site "Where" section (D3 map, OSM coastline in site/coast_ccb.json, ODbL) and app "Where"
